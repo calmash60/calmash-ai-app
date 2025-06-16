@@ -1,0 +1,10 @@
+[build]
+  publish = "." # Your static files (index.html) are in the root directory of the repo
+  functions = "netlify/functions" # Your serverless functions directory
+
+[[headers]]
+  for = "/.netlify/functions/*"
+  [headers.values]
+    Access-Control-Allow-Origin = "*" # Allows your frontend to call the function
+    Access-Control-Allow-Methods = "POST, GET, OPTIONS"
+    Access-Control-Allow-Headers = "Content-Type"
