@@ -10,6 +10,6 @@
   "author": "",
   "license": "ISC",
   "dependencies": {
-    "@google/generative-ai": "^0.11.3"  <-- THIS LINE IS CRUCIAL
+    "@google/generative-ai": "^0.11.3"  
   }
 }
