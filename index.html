@@ -379,7 +379,7 @@
             }
             .top-actions {
                 justify-content: center; /* Center the New Chat button on mobile */
-            }
+                }
             .top-actions button {
                 width: 100%; /* Make New Chat button full width on mobile */
                 box-sizing: border-box; /* Include padding/border in width */
@@ -387,3 +387,393 @@
         }
     </style>
 </head>
+<body>
+    <div class="container">
+        <h1>calmash ai</h1>
+
+        <div class="top-actions">
+            <button id="newChatButton">New Chat</button>
+        </div>
+
+        <div class="chat-history" id="chatHistory">
+            <div class="chat-message ai">
+                <strong>AI:</strong> Hello! I'm an AI assistant. What can I help you with today?
+            </div>
+        </div>
+
+        <div class="input-area">
+            <textarea id="promptInput" placeholder="Ask me anything..."></textarea>
+            <button id="generateButton" title="Send message">
+                <!-- SVG for an arrow icon (Material Design 'send' icon) -->
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
+                    <path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z"/>
+                </svg>
+            </button>
+        </div>
+
+        <div id="loadingIndicator" class="loading-indicator" style="display: none;">
+            <div class="loading-dot"></div>
+            <div class="loading-dot"></div>
+            <div class="loading-dot"></div>
+            <span>Generating...</span>
+        </div>
+
+        <!-- New: API Error Message Display -->
+        <div id="apiErrorMessage" style="display: none;"></div>
+    </div>
+
+    <!-- New Chat Confirmation Modal -->
+    <div id="newChatConfirmationModal" class="modal-overlay" style="display: none;">
+        <div class="modal-content">
+            <h3>Confirm New Chat</h3>
+            <p>Are you sure you want to start a new chat? This will clear the current conversation.</p>
+            <div class="modal-buttons">
+                <button id="confirmNewChatButton" class="primary-modal-btn">Yes, New Chat</button>
+                <button id="cancelNewChatConfirmationButton" class="cancel-modal-btn">Cancel</button>
+            </div>
+        </div>
+    </div>
+
+    <script type="module">
+        // --- DOM Elements (initialized inside DOMContentLoaded for safety) ---
+        let appContainer;
+        let promptInput;
+        let generateButton;
+        let loadingIndicator;
+        let chatHistoryDiv;
+        let newChatButton;
+        let apiErrorMessageDiv;
+
+        let newChatConfirmationModal;
+        let confirmNewChatButton;
+        let cancelNewChatConfirmationButton;
+
+
+        // --- Global State for Chat ---
+        let currentAbortController = null;
+        let currentChatHistory = [];
+
+        // --- Backend Endpoint ---
+        // The Netlify Function URL is now correctly set.
+        const backendApiUrl = "https://calmash-ai-app.netlify.app/.netlify/functions/generate-chat-response"; // Your Netlify Function URL
+
+        // --- Utility Functions ---
+
+        function showApiError(message) {
+            if (apiErrorMessageDiv) {
+                apiErrorMessageDiv.textContent = message;
+                apiErrorMessageDiv.style.display = 'block';
+            }
+        }
+
+        function hideApiError() {
+            if (apiErrorMessageDiv) {
+                apiErrorMessageDiv.style.display = 'none';
+                apiErrorMessageDiv.textContent = '';
+            }
+        }
+
+        function appendMessage(sender, content, codeData = null) {
+            const messageDiv = document.createElement('div');
+            messageDiv.classList.add('chat-message', sender);
+
+            const senderStrong = document.createElement('strong');
+            senderStrong.textContent = `${sender === 'user' ? 'You' : 'AI'}:`;
+            messageDiv.appendChild(senderStrong);
+
+            if (codeData && codeData.code !== null) {
+                if (codeData.preCodeText) {
+                    const preTextNode = document.createTextNode(codeData.preCodeText + '\n');
+                    messageDiv.appendChild(preTextNode);
+                }
+
+                const codePre = document.createElement('pre');
+                const codeCode = document.createElement('code');
+                codeCode.textContent = codeData.code;
+                codePre.appendChild(codeCode);
+                messageDiv.appendChild(codePre);
+
+                const codeActionsDiv = document.createElement('div');
+                codeActionsDiv.classList.add('code-actions');
+
+                const copyButton = document.createElement('button');
+                copyButton.textContent = 'Copy Code';
+                copyButton.onclick = () => {
+                    const textarea = document.createElement('textarea');
+                    textarea.value = codeData.code;
+                    document.body.appendChild(textarea);
+                    textarea.select();
+                    document.execCommand('copy');
+                    document.body.removeChild(textarea);
+                    alert('Code copied to clipboard!');
+                };
+
+                const downloadButton = document.createElement('button');
+                downloadButton.textContent = 'Download Code';
+                downloadButton.onclick = () => {
+                    const fileExtension = languageMap[codeData.language.toLowerCase()] || 'txt';
+                    const blob = new Blob([codeData.code], { type: 'text/plain' });
+                    const url = URL.createObjectURL(blob);
+                    const a = document.createElement('a');
+                    a.href = url;
+                    a.download = `generated_code.${fileExtension}`;
+                    document.body.appendChild(a);
+                    a.click();
+                    document.body.removeChild(a);
+                    URL.revokeObjectURL(url);
+                };
+
+                if (codeData.language.toLowerCase() === 'html' || codeData.language.toLowerCase() === 'htm') {
+                    const previewButton = document.createElement('button');
+                    previewButton.textContent = 'Preview HTML';
+                    previewButton.onclick = () => {
+                        const blob = new Blob([codeData.code], { type: 'text/html' });
+                        const url = URL.createObjectURL(blob);
+                        window.open(url, '_blank');
+                        URL.revokeObjectURL(url);
+                    };
+                    codeActionsDiv.appendChild(previewButton);
+                }
+
+                codeActionsDiv.appendChild(copyButton);
+                codeActionsDiv.appendChild(downloadButton);
+                messageDiv.appendChild(codeActionsDiv);
+
+                if (codeData.postCodeText) {
+                    const postTextNode = document.createTextNode('\n' + codeData.postCodeText);
+                    messageDiv.appendChild(postTextNode);
+                }
+
+            } else {
+                const textNode = document.createTextNode(content);
+                messageDiv.appendChild(textNode);
+            }
+
+            if (chatHistoryDiv) {
+                chatHistoryDiv.appendChild(messageDiv);
+                chatHistoryDiv.scrollTop = chatHistoryDiv.scrollHeight;
+            }
+        }
+
+        const languageMap = {
+            'html': 'html', 'htm': 'html', 'xml': 'xml', 'css': 'css',
+            'javascript': 'js', 'js': 'js', 'json': 'json', 'python': 'py', 'py': 'py',
+            'java': 'java', 'c': 'c', 'cpp': 'cpp', 'c++': 'cpp', 'cs': 'cs',
+            'php': 'php', 'ruby': 'rb', 'go': 'go', 'swift': 'swift', 'kotlin': 'kt',
+            'rust': 'rs', 'shell': 'sh', 'bash': 'sh', 'sql': 'sql',
+            'markdown': 'md', 'md': 'md', 'yaml': 'yaml', 'yml': 'yaml',
+            'txt': 'txt', 'plain': 'txt'
+        };
+
+        function extractCodeAndLanguage(text) {
+            const match = text.match(/^(.*?)\n?```(\w+)?\n([\s\S]*?)\n```\n?(.*)$/s);
+            if (match) {
+                const preCodeText = match[1] ? match[1].trim() : '';
+                const language = match[2] ? match[2].toLowerCase() : 'txt';
+                const code = match[3] ? match[3].trim() : '';
+                const postCodeText = match[4] ? match[4].trim() : '';
+                return { preCodeText, code, language, postCodeText };
+            }
+            return { preCodeText: null, code: null, language: null, postCodeText: null };
+        }
+
+        async function generateContent() {
+            hideApiError();
+
+            const prompt = promptInput.value.trim();
+            if (!prompt) {
+                alert("Please enter a prompt!");
+                return;
+            }
+
+            appendMessage('user', prompt);
+            currentChatHistory.push({ role: "user", parts: [{ text: prompt }] });
+            promptInput.value = '';
+
+            if (loadingIndicator) loadingIndicator.style.display = 'flex';
+            if (generateButton) generateButton.disabled = true;
+            if (newChatButton) newChatButton.disabled = true;
+
+            currentAbortController = new AbortController();
+            const signal = currentAbortController.signal;
+
+            try {
+                // The backendApiUrl is now correctly set to your Netlify Function URL
+                const payload = { chatHistory: currentChatHistory };
+
+                const response = await fetch(backendApiUrl, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload),
+                    signal: signal
+                });
+
+                if (!response.ok) {
+                    const errorData = await response.json();
+                    console.error('Backend Call Error:', errorData);
+                    const errorMessage = `Backend Error: ${response.status} - ${errorData.error || 'Something went wrong with the backend.'}`;
+                    showApiError(errorMessage);
+                    appendMessage('ai', "Failed to get a response from AI via backend. Check error message above.");
+                    currentChatHistory.pop();
+                    return;
+                }
+
+                const result = await response.json();
+
+                if (result.success && result.text) {
+                    let fullTextResponse = result.text;
+
+                    const codeData = extractCodeAndLanguage(fullTextResponse);
+
+                    if (codeData.code) {
+                        appendMessage('ai', fullTextResponse, codeData);
+                    } else {
+                        appendMessage('ai', fullTextResponse, null);
+                    }
+                    currentChatHistory.push({ role: "model", parts: [{ text: fullTextResponse }] });
+
+                } else {
+                    const warnMessage = result.error || "No valid response from backend. Try again!";
+                    appendMessage('ai', warnMessage);
+                    showApiError("Backend response was empty or malformed.");
+                    console.warn('Unexpected backend response structure:', result);
+                    currentChatHistory.pop();
+                }
+            } catch (error) {
+                if (error.name === 'AbortError') {
+                    console.log('Text generation aborted by user.');
+                    appendMessage('ai', "Response generation stopped.");
+                } else {
+                    console.error('Fetch error calling backend:', error);
+                    const errorMessage = `Network Error: ${error.message}. Could not reach backend.`;
+                    showApiError(errorMessage);
+                    appendMessage('ai', `Failed to connect to backend. Check connection.`);
+                    currentChatHistory.pop();
+                }
+            } finally {
+                if (loadingIndicator) loadingIndicator.style.display = 'none';
+                if (generateButton) generateButton.disabled = false;
+                if (newChatButton) newChatButton.disabled = false;
+                currentAbortController = null;
+            }
+        }
+
+        function newChatSession() {
+            hideApiError();
+            if (chatHistoryDiv) {
+                chatHistoryDiv.innerHTML = `
+                    <div class="chat-message ai">
+                        <strong>AI:</strong> Hello! I'm an AI assistant. What can I help you with today?
+                    </div>
+                `;
+            }
+            currentChatHistory = [{ role: "model", parts: [{ text: "Hello! I'm an AI assistant. What can I help you with today?" }] }];
+            if (promptInput) promptInput.value = '';
+            console.log("New chat session started.");
+        }
+
+        document.addEventListener('DOMContentLoaded', () => {
+            appContainer = document.querySelector('.container');
+            console.log('DOM Element: appContainer (container)', appContainer);
+
+            promptInput = document.getElementById('promptInput');
+            console.log('DOM Element: promptInput', promptInput);
+
+            generateButton = document.getElementById('generateButton');
+            console.log('DOM Element: generateButton', generateButton);
+
+            loadingIndicator = document.getElementById('loadingIndicator');
+            console.log('DOM Element: loadingIndicator', loadingIndicator);
+
+            chatHistoryDiv = document.getElementById('chatHistory');
+            console.log('DOM Element: chatHistoryDiv', chatHistoryDiv);
+
+            newChatButton = document.getElementById('newChatButton');
+            console.log('DOM Element: newChatButton', newChatButton);
+
+            apiErrorMessageDiv = document.getElementById('apiErrorMessage');
+            console.log('DOM Element: apiErrorMessageDiv', apiErrorMessageDiv);
+
+            newChatConfirmationModal = document.getElementById('newChatConfirmationModal');
+            console.log('DOM Element: newChatConfirmationModal', newChatConfirmationModal);
+
+            confirmNewChatButton = document.getElementById('confirmNewChatButton');
+            console.log('DOM Element: confirmNewChatButton', confirmNewChatButton);
+
+            cancelNewChatConfirmationButton = document.getElementById('cancelNewChatConfirmationButton');
+            console.log('DOM Element: cancelNewChatConfirmationButton', cancelNewChatConfirmationButton);
+
+
+            if (generateButton) {
+                generateButton.addEventListener('click', () => {
+                    console.log("Generate button clicked.");
+                    if (currentAbortController && currentAbortController.signal.aborted === false) {
+                        currentAbortController.abort();
+                        console.log("Aborting current generation.");
+                    } else {
+                        generateContent();
+                        console.log("Starting new content generation.");
+                    }
+                });
+            } else {
+                console.error("ERROR: generateButton not found! Cannot attach click listener.");
+            }
+
+            if (promptInput) {
+                promptInput.addEventListener('keydown', (event) => {
+                    console.log("Prompt input keydown:", event.key);
+                    if (event.key === 'Enter' && !event.shiftKey && generateButton && !generateButton.disabled) {
+                        event.preventDefault();
+                        generateContent();
+                        console.log("Generate content triggered by Enter key.");
+                    }
+                });
+            } else {
+                console.error("ERROR: promptInput not found! Cannot attach keydown listener.");
+            }
+
+            if (newChatButton) {
+                newChatButton.addEventListener('click', () => {
+                    console.log("New Chat button clicked.");
+                    if (newChatConfirmationModal) {
+                        newChatConfirmationModal.style.display = 'flex';
+                        console.log("New Chat confirmation modal displayed.");
+                    } else {
+                        console.error("ERROR: newChatConfirmationModal element not found. Falling back to direct new chat.");
+                        newChatSession();
+                    }
+                });
+            } else {
+                console.error("ERROR: newChatButton not found! Cannot attach click listener.");
+            }
+
+            if (confirmNewChatButton) {
+                confirmNewChatButton.addEventListener('click', () => {
+                    console.log("Confirm New Chat button clicked.");
+                    if (newChatConfirmationModal) {
+                        newChatConfirmationModal.style.display = 'none';
+                        console.log("New Chat confirmation modal hidden.");
+                    }
+                    newChatSession();
+                });
+            } else {
+                console.error("ERROR: confirmNewChatButton not found! Cannot attach click listener.");
+            }
+
+            if (cancelNewChatConfirmationButton) {
+                cancelNewChatConfirmationButton.addEventListener('click', () => {
+                    console.log("Cancel New Chat button clicked.");
+                    if (newChatConfirmationModal) {
+                        newChatConfirmationModal.style.display = 'none';
+                        console.log("New Chat confirmation modal hidden.");
+                    }
+                });
+            } else {
+                console.error("ERROR: cancelNewChatConfirmationButton not found! Cannot attach click listener.");
+            }
+
+            newChatSession();
+        });
+    </script>
+</body>
+</html>
