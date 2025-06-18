@@ -727,7 +727,9 @@
             </div>
         </div>
     </div>
-<script type="module">
+
+
+    <script type="module">
         // --- DOM Elements ---
         let appContainer;
         let promptInput;
@@ -760,12 +762,12 @@
         // --- Global State for Chat ---
         let currentAbortController = null;
         let currentChatHistory = [];
-        let savedChats = [];
+        let savedChats = []; // Array to hold all chat objects from localStorage
         let currentChatId = null;
-        let userMessageCountInCurrentChat = 0;
+        let userMessageCountInCurrentChat = 0; // To trigger auto-naming
 
         // --- Backend Endpoint ---
-        const backendApiUrl = "https://calmash-ai-app.netlify.app/.netlify/functions/generate-chat-response";
+        const backendApiUrl = "https://calmash-ai-app.netlify.app/.netlify/functions/generate-chat-response"; // Your Netlify Function URL
 
         // --- Utility Functions ---
 
