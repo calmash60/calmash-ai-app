@@ -2,20 +2,27 @@
 
 const { GoogleGenerativeAI } = require('@google/generative-ai');
 
-// This function will be triggered by Netlify's build process,
-// so process.env.GEMINI_API_KEY will come from Netlify's environment variables.
-const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
+// --- API Keys from Environment Variables ---
+// Using the "old" names as requested. Both will point to gemini-2.0-flash keys.
+const GEMINI_PRO_API_KEY = process.env.GEMINI_PRO_API_KEY; // For 'calmash 1.0' dropdown option
+const GEMINI_FLASH_API_KEY = process.env.GEMINI_FLASH_API_KEY; // For 'calmash 1.0 flash' dropdown option
 
-if (!GEMINI_API_KEY) {
-    console.error("FATAL ERROR: GEMINI_API_KEY environment variable is not set.");
-    // In a production app, you might want a more robust error handling
+// Function to initialize the AI model with a specific key and model name
+function initializeGeminiModel(apiKey, modelName) {
+    if (!apiKey) {
+        console.error(`API key missing for model: ${modelName}`);
+        return null;
+    }
+    try {
+        const genAI = new GoogleGenerativeAI(apiKey);
+        return genAI.getGenerativeModel({ model: modelName });
+    } catch (e) {
+        console.error(`Failed to initialize Gemini model ${modelName} with provided key:`, e);
+        return null;
+    }
 }
 
-const genAI = new GoogleGenerativeAI(GEMINI_API_KEY);
-const model = genAI.getGenerativeModel({ model: "gemini-2.0-flash" });
-
 exports.handler = async function(event, context) {
-    // Only allow POST requests
     if (event.httpMethod !== 'POST') {
         return {
             statusCode: 405,
@@ -24,26 +31,88 @@ exports.handler = async function(event, context) {
     }
 
     try {
-        const { chatHistory } = JSON.parse(event.body);
+        const { chatHistory, selectedModelId, requestType } = JSON.parse(event.body);
 
         if (!chatHistory || !Array.isArray(chatHistory)) {
-            console.error("Invalid request body:", event.body);
+            console.error("Invalid request body: chatHistory array expected.");
             return {
                 statusCode: 400,
                 body: 'Invalid request body: chatHistory array expected.'
             };
         }
 
-        const creatorKeywords = ["who made you", "who created you", "your creator", "your author", "who is your developer", "who built you", "who trained you", "who are you trained by"];
-        const latestUserPrompt = chatHistory.length > 0 && chatHistory[chatHistory.length - 1].role === 'user' ? chatHistory[chatHistory.length - 1].parts[0].text : '';
-        const isCreatorQuestion = creatorKeywords.some(keyword => latestUserPrompt.toLowerCase().includes(keyword));
+        let modelToUse = null; // The actual Gemini model instance
+        const targetModelName = "gemini-2.0-flash"; // Both options will use the Flash model
+
+        // Determine which specific Flash API key to use based on the selectedModelId
+        if (selectedModelId === "calmash_1_0_flash") {
+            modelToUse = initializeGeminiModel(GEMINI_FLASH_API_KEY, targetModelName);
+            if (!modelToUse) {
+                // Fallback to the 'pro' named key if 'flash' named key is missing/invalid
+                console.warn("GEMINI_FLASH_API_KEY (for 'calmash 1.0 flash') not configured or invalid. Falling back to GEMINI_PRO_API_KEY.");
+                modelToUse = initializeGeminiModel(GEMINI_PRO_API_KEY, targetModelName);
+            }
+        } else { // Default to 'calmash_1_0' (uses the 'pro' named key)
+            modelToUse = initializeGeminiModel(GEMINI_PRO_API_KEY, targetModelName);
+            if (!modelToUse) {
+                // Fallback to the 'flash' named key if 'pro' named key is missing/invalid
+                console.warn("GEMINI_PRO_API_KEY (for 'calmash 1.0') not configured or invalid. Attempting to use GEMINI_FLASH_API_KEY as last resort.");
+                modelToUse = initializeGeminiModel(GEMINI_FLASH_API_KEY, targetModelName);
+            }
+        }
+
+        if (!modelToUse) {
+            console.error("FATAL ERROR: No valid Gemini Flash API key could be initialized using either GEMINI_PRO_API_KEY or GEMINI_FLASH_API_KEY.");
+            return {
+                statusCode: 500,
+                body: JSON.stringify({ success: false, error: "AI service not configured. Please check your Gemini Flash API keys on Netlify." })
+            };
+        }
+        console.log(`Using Gemini model: ${targetModelName}`);
+
+
+        const creatorKeywords = [
+            "who made you", "who created you", "your creator", "your author",
+            "who is your developer", "who built you", "who trained you", "who are you trained by"
+        ];
+        const customCreatorKeywords = [
+            "who is calmash1", "what is calmash1", "tell me about calmash1",
+            "who is grady hanson", "what is grady hanson", "tell me about grady hanson"
+        ];
+
+        const latestUserPrompt = chatHistory.length > 0 && chatHistory[chatHistory.length - 1].role === 'user' ? chatHistory[chatHistory.length - 1].parts[0].text.toLowerCase() : '';
+
+        const isDirectCreatorQuestion = creatorKeywords.some(keyword => latestUserPrompt.includes(keyword));
+        const isCustomCreatorFollowUp = customCreatorKeywords.some(keyword => latestUserPrompt.includes(keyword));
 
         let finalResponseText;
 
-        if (isCreatorQuestion) {
-            finalResponseText = "I was made by calmash1 (also known as Grady Hanson).";
+        if (isDirectCreatorQuestion || isCustomCreatorFollowUp) {
+            // Hardcoded response for direct creator questions or follow-ups about calmash1/Grady Hanson
+            finalResponseText = "I'm created by calmash1 also known as Grady Hanson.";
+        } else if (requestType === 'generateChatName') {
+            // Logic for generating chat name
+            const nameGenerationPrompt = `Summarize the following conversation into a very short, descriptive chat title (max 5 words). Do NOT use quotes in the title.
+            Conversation snippet:
+            ${chatHistory.map(msg => `${msg.role}: ${msg.parts[0].text}`).join('\n').substring(0, 1000)}
+            Title:`; // Limit snippet length to avoid too many tokens
+
+            const nameResult = await modelToUse.generateContent(nameGenerationPrompt);
+            const nameApiResponse = nameResult.response;
+            let generatedName = nameApiResponse.text().trim();
+
+            // Clean up common AI naming artifacts
+            generatedName = generatedName.replace(/^['"]|['"]$/g, ''); // Remove leading/trailing quotes
+            generatedName = generatedName.split('\n')[0]; // Take only the first line
+
+            return {
+                statusCode: 200,
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ success: true, chatName: generatedName })
+            };
+
         } else {
-            // Sanitize chat history for Gemini API: ensure custom names are reverted to original for model context
+            // Standard content generation
             const sanitizedChatHistoryForGemini = chatHistory.map(msg => {
                 if (msg.role === 'user' && msg.parts && msg.parts[0] && msg.parts[0].text) {
                     let text = msg.parts[0].text;
@@ -55,61 +124,45 @@ exports.handler = async function(event, context) {
                 return msg;
             });
 
-            const result = await model.generateContent({ contents: sanitizedChatHistoryForGemini });
+            const result = await modelToUse.generateContent({ contents: sanitizedChatHistoryForGemini });
             const apiResponse = result.response;
             finalResponseText = apiResponse.text();
 
             // Apply specific "Google" to "calmash1" replacements ONLY for AI's self-descriptive phrases
-            finalResponseText = finalResponseText.replace(
-                /I am a large language model, trained by Google\./gi,
-                "I am a large language model, trained by calmash1."
-            );
-            finalResponseText = finalResponseText.replace(
-                /I'm a large language model, trained by Google\./gi,
-                "I'm a large language model, trained by calmash1."
-            );
-            finalResponseText = finalResponseText.replace(
-                /I am an AI assistant developed by Google\./gi,
-                "I am an AI assistant developed by calmash1."
-            );
-            finalResponseText = finalResponseText.replace(
-                /I'm an AI assistant developed by Google\./gi,
-                "I'm an AI assistant developed by calmash1."
-            );
-            finalResponseText = finalResponseText.replace(
-                /I was developed by Google\./gi,
-                "I was developed by calmash1."
-            );
-            finalResponseText = finalResponseText.replace(
-                /I was trained by Google\./gi,
-                "I was trained by calmash1."
-            );
-            finalResponseText = finalResponseText.replace(
-                /I am a Google-trained AI\./gi,
-                "I am a calmash1-trained AI."
-            );
-            finalResponseText = finalResponseText.replace(
-                /trained by Google/gi,
-                "trained by calmash1"
-            );
-            finalResponseText = finalResponseText.replace(
-                /developed by Google/gi,
-                "developed by calmash1"
-            );
-        }
+            const replacements = {
+                /I am a large language model, trained by Google\./gi: "I am a large language model, trained by calmash1.",
+                /I'm a large language model, trained by Google\./gi: "I'm a large language model, trained by calmash1.",
+                /I am an AI assistant developed by Google\./gi: "I am an AI assistant developed by calmash1.",
+                /I'm an AI assistant developed by Google\./gi: "I'm an AI assistant developed by calmash1.",
+                /I was developed by Google\./gi: "I was developed by calmash1.",
+                /I was trained by Google\./gi: "I was trained by calmash1.",
+                /I am a Google-trained AI\./gi: "I am a calmash1-trained AI.",
+                /trained by Google/gi: "trained by calmash1",
+                /developed by Google/gi: "developed by calmash1",
+                /Google's AI/gi: "calmash1's AI",
+                /a Google product/gi: "a calmash1 product",
+                /Google engineers/gi: "calmash1's developers",
+                /my developers at Google/gi: "my developer, calmash1",
+                /my creators at Google/gi: "my creator, calmash1"
+            };
 
-        return {
-            statusCode: 200,
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ success: true, text: finalResponseText })
-        };
+            for (const pattern in replacements) {
+                finalResponseText = finalResponseText.replace(new RegExp(pattern, 'gi'), replacements[pattern]);
+            }
+
+            return {
+                statusCode: 200,
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ success: true, text: finalResponseText })
+            };
+        }
 
     } catch (error) {
         console.error("Error in Netlify Function:", error);
         return {
             statusCode: 500,
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ success: false, error: "An internal server error occurred." })
+            body: JSON.stringify({ success: false, error: error.message || "An internal server error occurred." })
         };
     }
 };
