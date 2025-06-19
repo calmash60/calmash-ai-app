@@ -10,7 +10,6 @@ const GEMINI_FLASH_API_KEY = process.env.GEMINI_FLASH_API_KEY;
 // Function to initialize the AI model with a specific key and model name
 function initializeGeminiModel(apiKey, modelName) {
     if (!apiKey) {
-        // Log a more descriptive error if API key is missing
         console.error(`ERROR: API key for ${modelName} is missing in Netlify environment variables.`);
         return null;
     }
@@ -25,23 +24,21 @@ function initializeGeminiModel(apiKey, modelName) {
 
 exports.handler = async function(event, context) {
     // Enable CORS for all origins, which is necessary for your frontend on a different domain.
-    // In a production environment, you might want to restrict this to specific origins (e.g., your Netlify site URL).
     const headers = {
         'Access-Control-Allow-Origin': '*', // Allows requests from any origin
         'Access-Control-Allow-Methods': 'POST, OPTIONS',
         'Access-Control-Allow-Headers': 'Content-Type', // Important for JSON payloads
     };
 
-    // Handle preflight OPTIONS request for CORS. Browsers send this before the actual POST.
+    // Handle preflight OPTIONS request for CORS.
     if (event.httpMethod === 'OPTIONS') {
         return {
             statusCode: 204, // No Content
             headers: headers,
-            body: '' // No body for OPTIONS request
+            body: '' 
         };
     }
 
-    // Only allow POST requests for actual content generation
     if (event.httpMethod !== 'POST') {
         return {
             statusCode: 405,
@@ -51,11 +48,8 @@ exports.handler = async function(event, context) {
     }
 
     try {
-        // Parse the request body. The frontend sends 'chatHistory' and 'requestType'.
-        // 'selectedModelId' is no longer sent from your current HTML, so we don't expect it.
         const { chatHistory, requestType } = JSON.parse(event.body);
 
-        // Basic validation for chatHistory
         if (!chatHistory || !Array.isArray(chatHistory)) {
             console.error("Invalid request body: chatHistory array expected.");
             return {
@@ -65,12 +59,9 @@ exports.handler = async function(event, context) {
             };
         }
 
-        // Initialize the Gemini model. This backend simplifies to always use gemini-2.0-flash
-        // with the single API key you will provide.
         const modelToUse = initializeGeminiModel(GEMINI_FLASH_API_KEY, "gemini-2.0-flash");
-        const currentGeminiModelId = "gemini-2.0-flash"; // Confirming which model is used
+        const currentGeminiModelId = "gemini-2.0-flash";
 
-        // If model initialization failed (e.g., missing or invalid API key), return a 500 error.
         if (!modelToUse) {
             console.error("FATAL ERROR: Gemini Flash API key missing or invalid. Model cannot be initialized.");
             return {
@@ -82,9 +73,7 @@ exports.handler = async function(event, context) {
         console.log(`Successfully initialized and using Gemini model: ${currentGeminiModelId}`);
 
 
-        // --- Custom Logic for Creator Questions (handled directly by frontend now, but kept here for robustness) ---
-        // The frontend HTML you provided handles this directly, but if this backend was used
-        // by a different frontend, it would still respond appropriately for these keywords.
+        // --- Custom Logic for Creator Questions (though frontend handles it too, kept for robustness) ---
         const creatorKeywords = [
             "who made you", "who created you", "your creator", "your author",
             "who is your developer", "who built you", "who trained you", "who are you trained by"
@@ -94,7 +83,6 @@ exports.handler = async function(event, context) {
             "who is grady hanson", "what is grady hanson", "tell me about grady hanson"
         ];
 
-        // Get the latest user prompt to check for creator-related questions
         const latestUserPrompt = chatHistory.length > 0 && chatHistory[chatHistory.length - 1].role === 'user' ? chatHistory[chatHistory.length - 1].parts[0].text.toLowerCase() : '';
 
         const isDirectCreatorQuestion = creatorKeywords.some(keyword => latestUserPrompt.includes(keyword));
@@ -103,11 +91,10 @@ exports.handler = async function(event, context) {
         let finalResponseText;
 
         if (isDirectCreatorQuestion || isCustomCreatorFollowUp) {
-            // Hardcoded response for direct creator questions or follow-ups about calmash1/Grady Hanson
             finalResponseText = "I'm created by calmash1 also known as Grady Hanson.";
         } else if (requestType === 'generateChatName') {
-            // This 'generateChatName' request type is from older HTML versions; not expected with your current one.
-            // Keeping it here for robustness, in case you use a frontend that sends this.
+            // This 'generateChatName' request type is not sent by your current HTML.
+            // Keeping it here just in case you integrate a feature that uses it later.
             const nameGenerationPrompt = `Summarize the following conversation into a very short, descriptive chat title (max 5 words). Do NOT use quotes in the title.
             Conversation snippet:
             ${chatHistory.map(msg => `${msg.role}: ${msg.parts[0].text}`).join('\n').substring(0, 1000)}
@@ -117,8 +104,8 @@ exports.handler = async function(event, context) {
             const nameApiResponse = nameResult.response;
             let generatedName = nameApiResponse.text().trim();
 
-            generatedName = generatedName.replace(/^['"]|['"]$/g, ''); // Remove leading/trailing quotes
-            generatedName = generatedName.split('\n')[0]; // Take only the first line
+            generatedName = generatedName.replace(/^['"]|['"]$/g, '');
+            generatedName = generatedName.split('\n')[0];
 
             return {
                 statusCode: 200,
@@ -128,8 +115,7 @@ exports.handler = async function(event, context) {
 
         } else {
             // --- Standard Content Generation ---
-            // Prepare chat history for the Gemini API call.
-            // Replace custom names back to "Google" for the actual model call to understand context correctly.
+            // Sanitize chat history for the Gemini API call by replacing custom names with "Google".
             const sanitizedChatHistoryForGemini = chatHistory.map(msg => {
                 if (msg.role === 'user' && msg.parts && msg.parts[0] && msg.parts[0].text) {
                     let text = msg.parts[0].text;
@@ -137,15 +123,14 @@ exports.handler = async function(event, context) {
                     text = text.replace(/Grady Hanson/gi, 'Google');
                     return { ...msg, parts: [{ text }] };
                 }
-                return msg; // Return other messages as is (e.g., 'model' roles)
+                return msg;
             });
 
             const result = await modelToUse.generateContent({ contents: sanitizedChatHistoryForGemini });
             const apiResponse = result.response;
             finalResponseText = apiResponse.text();
 
-            // --- Apply "Google" to "calmash1" Replacements for AI's Self-Descriptive Phrases ---
-            // This is the branding replacement you wanted.
+            // --- Apply "Google" to "calmash1" Branding Replacements ---
             const replacements = {
                 /I am a large language model, trained by Google\./gi: "I am a large language model, trained by calmash1.",
                 /I'm a large language model, trained by Google\./gi: "I'm a large language model, trained by calmash1.",
@@ -167,7 +152,6 @@ exports.handler = async function(event, context) {
                 finalResponseText = finalResponseText.replace(new RegExp(pattern, 'gi'), replacements[pattern]);
             }
 
-            // Return success response with the generated text
             return {
                 statusCode: 200,
                 headers: headers,
@@ -176,9 +160,7 @@ exports.handler = async function(event, context) {
         }
 
     } catch (error) {
-        // Log the full error for debugging on Netlify
         console.error("Error processing Netlify Function request:", error);
-        // Return a 500 Internal Server Error for any unhandled exceptions
         return {
             statusCode: 500,
             headers: headers,
