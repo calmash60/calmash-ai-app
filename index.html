@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>calmash ai</title>
+    <title>Simple AI Chatbot</title>
     <!-- Inter font for clean modern look -->
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;700&display=swap" rel="stylesheet">
     <style>
@@ -17,7 +17,7 @@
             align-items: center;
             min-height: 100vh;
             color: #333;
-            box-sizing: border-box;
+            box-sizing: border;
             flex-direction: column; /* Stack vertically for simpler layout */
         }
 
@@ -322,6 +322,19 @@
             background-color: #b0b0b0;
         }
 
+        /* New: API Error Message Styling */
+        #apiErrorMessage {
+            color: #d32f2f; /* Red color for errors */
+            background-color: #ffebee; /* Light red background */
+            border: 1px solid #ef9a9a;
+            border-radius: 8px;
+            padding: 10px;
+            margin-top: 10px;
+            text-align: center;
+            font-size: 0.9em;
+            display: none; /* Hidden by default */
+        }
+
 
         /* Responsive adjustments */
         @media (max-width: 768px) {
@@ -376,7 +389,7 @@
 </head>
 <body>
     <div class="container">
-        <h1>calmash ai</h1>
+        <h1>Simple AI Chatbot</h1>
 
         <div class="top-actions">
             <button id="newChatButton">New Chat</button>
@@ -437,8 +450,8 @@
         let currentChatHistory = [];
 
         // --- API Keys & Endpoints ---
-        // Your Netlify Function URL. This MUST be correct.
-        // It should look like: https://YOUR-NETLIFY-SITE-NAME.netlify.app/.netlify/functions/generate-chat-response
+        // This is the URL for your Netlify serverless function.
+        // Replace 'YOUR-NETLIFY-SITE-NAME' with your actual Netlify site name.
         const backendApiUrl = "https://calmash-ai-app.netlify.app/.netlify/functions/generate-chat-response";
 
         // --- Utility Functions ---
@@ -579,7 +592,7 @@
             }
 
             // --- Custom Attribution Logic ---
-            const attributionKeywords = ["who made you", "who created you", "your creator", "your author", "who is your developer", "who built you"];
+            const attributionKeywords = ["who made you", "who created you", "your creator", "your author", "who is your developer", "who built you", "who is calmash1", "what is calmash1", "tell me about calmash1", "who is grady hanson", "what is grady hanson", "tell me about grady hanson"];
             const lowerCasePrompt = prompt.toLowerCase();
             let isAttributionQuestion = attributionKeywords.some(keyword => lowerCasePrompt.includes(keyword));
 
@@ -589,7 +602,7 @@
             promptInput.value = ''; // Clear input immediately
 
             if (isAttributionQuestion) {
-                const attributionResponse = "I was made by calmash1.";
+                const attributionResponse = "I'm created by calmash1 also known as Grady Hanson.";
                 appendMessage('ai', attributionResponse);
                 currentChatHistory.push({ role: "model", parts: [{ text: attributionResponse }] });
                 return; // Stop here for attribution questions
@@ -608,9 +621,11 @@
             const signal = currentAbortController.signal;
 
             try {
-                // The frontend no longer sends 'selectedModelId' since the dropdown is removed.
-                // The backend will now default to 'gemini-2.0-flash' using the single key.
-                const payload = { contents: currentChatHistory };
+                // The frontend now sends the chatHistory and a requestType to the backend function.
+                const payload = { 
+                    chatHistory: currentChatHistory,
+                    requestType: 'generateContent' // Indicate it's a content generation request
+                };
 
                 const response = await fetch(backendApiUrl, {
                     method: 'POST',
@@ -621,9 +636,9 @@
 
                 if (!response.ok) {
                     const errorData = await response.json();
-                    console.error('API Error:', errorData);
+                    console.error('Backend API Error:', errorData);
                     // Display a more user-friendly error message if fetch failed.
-                    const errorMessage = `Error: ${errorData.error || 'Something went wrong with the API request.'}`;
+                    const errorMessage = `Error: ${errorData.error || 'Something went wrong with the backend.'}`;
                     appendMessage('ai', "Failed to connect to the AI: " + errorMessage); // Explicitly state "Failed to connect"
                     currentChatHistory.pop(); // Remove user message if API call failed
                     return;
@@ -647,7 +662,7 @@
 
                 } else {
                     appendMessage('ai', "No valid response from AI. Try again!");
-                    console.warn('Unexpected API response structure:', result);
+                    console.warn('Unexpected backend response structure:', result);
                     currentChatHistory.pop(); // Remove user message if AI gave no valid response
                 }
             } catch (error) {
@@ -656,7 +671,7 @@
                     appendMessage('ai', "Response generation stopped.");
                 } else {
                     console.error('Fetch error:', error);
-                    appendMessage('ai', `Failed to connect to the AI: ${error.message}`);
+                    appendMessage('ai', `Failed to connect to the AI: ${error.message}. Check your internet connection.`);
                     currentChatHistory.pop(); // Remove user message if network/other error
                 }
             } finally {
