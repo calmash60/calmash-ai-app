@@ -437,10 +437,8 @@
         let currentChatHistory = [];
 
         // --- API Keys & Endpoints ---
-        // For the Canvas environment, leave geminiApiKey as an empty string.
-        // The system will automatically provide the API key at runtime for Google models.
-        const geminiApiKey = ""; // This is now handled by Netlify function's environment variable
-        // The URL for your Netlify serverless function
+        // Your Netlify Function URL. This MUST be correct.
+        // It should look like: https://YOUR-NETLIFY-SITE-NAME.netlify.app/.netlify/functions/generate-chat-response
         const backendApiUrl = "https://calmash-ai-app.netlify.app/.netlify/functions/generate-chat-response";
 
         // --- Utility Functions ---
@@ -571,33 +569,6 @@
         }
 
         /**
-         * Replaces specific phrases in the text with "calmash1" for attribution.
-         * @param {string} text - The input text.
-         * @returns {string} The modified text.
-         */
-        function applyAttributionReplacement(text) {
-            const patterns = [
-                /I am a large language model trained by Google/gi,
-                /I'm a large language model trained by Google/gi,
-                /I am an AI assistant developed by Google/gi,
-                /I'm an AI assistant developed by Google/gi,
-                /I am developed by Google/gi,
-                /I was trained by Google/gi,
-                /I am a Google-trained AI/gi,
-                /a large language model trained by Google/gi,
-                /a Google AI/gi,
-                /Google's AI model/gi,
-                /Google AI/gi,
-                /Google/gi
-            ];
-            let modifiedText = text;
-            patterns.forEach(pattern => {
-                modifiedText = modifiedText.replace(pattern, 'calmash1');
-            });
-            return modifiedText;
-        }
-
-        /**
          * Handles the generation of AI content by calling the Gemini API.
          */
         async function generateContent() {
@@ -637,9 +608,10 @@
             const signal = currentAbortController.signal;
 
             try {
+                // The frontend no longer sends 'selectedModelId' since the dropdown is removed.
+                // The backend will now default to 'gemini-2.0-flash' using the single key.
                 const payload = { contents: currentChatHistory };
 
-                // The backendApiUrl now handles the model selection internally
                 const response = await fetch(backendApiUrl, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
@@ -650,8 +622,9 @@
                 if (!response.ok) {
                     const errorData = await response.json();
                     console.error('API Error:', errorData);
-                    const errorMessage = `Error: ${errorData.error.message || 'Something went wrong with the API request.'}`;
-                    appendMessage('ai', errorMessage);
+                    // Display a more user-friendly error message if fetch failed.
+                    const errorMessage = `Error: ${errorData.error || 'Something went wrong with the API request.'}`;
+                    appendMessage('ai', "Failed to connect to the AI: " + errorMessage); // Explicitly state "Failed to connect"
                     currentChatHistory.pop(); // Remove user message if API call failed
                     return;
                 }
