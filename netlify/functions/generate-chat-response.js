@@ -3,9 +3,11 @@
 const { GoogleGenerativeAI } = require('@google/generative-ai');
 
 // --- API Keys from Environment Variables ---
-// Using the "old" names as requested. Both will point to gemini-2.0-flash keys.
-const GEMINI_PRO_API_KEY = process.env.GEMINI_PRO_API_KEY; // For 'calmash 1.0' dropdown option
-const GEMINI_FLASH_API_KEY = process.env.GEMINI_FLASH_API_KEY; // For 'calmash 1.0 flash' dropdown option
+// These are loaded from Netlify's environment settings, not hardcoded here.
+// Key for the default 'calmash 1.0' option (will use gemini-2.0-flash)
+const GEMINI_PRO_API_KEY = process.env.GEMINI_PRO_API_KEY; 
+// Key for the 'calmash 1.0 flash' option (will also use gemini-2.0-flash)
+const GEMINI_FLASH_API_KEY = process.env.GEMINI_FLASH_API_KEY; 
 
 // Function to initialize the AI model with a specific key and model name
 function initializeGeminiModel(apiKey, modelName) {
@@ -42,7 +44,7 @@ exports.handler = async function(event, context) {
         }
 
         let modelToUse = null; // The actual Gemini model instance
-        const targetModelName = "gemini-2.0-flash"; // Both options will use the Flash model
+        const targetModelName = "gemini-2.0-flash"; // Both options use this model
 
         // Determine which specific Flash API key to use based on the selectedModelId
         if (selectedModelId === "calmash_1_0_flash") {
