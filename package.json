@@ -1,0 +1,16 @@
+{
+  "name": "calmash-ai-chatbot",
+  "version": "1.0.0",
+  "description": "calmash ai chatbot frontend and Vercel serverless function",
+  "main": "api/generate-chat-response.js",
+  "scripts": {
+    "start": "vercel dev",
+    "deploy": "vercel --prod"
+  },
+  "keywords": [],
+  "author": "Your Name Here",
+  "license": "ISC",
+  "dependencies": {
+    "@google/generative-ai": "^0.11.3"
+  }
+}
