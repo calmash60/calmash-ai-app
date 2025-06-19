@@ -3,7 +3,23 @@ export async function handler(event, context) {
   const apiKey = process.env.GEMINI_API_KEY;
 
   const question = prompt.toLowerCase();
-  const creatorPhrases = ["who made you", "who created you", "your creator", "who built you", "who's your developer"];
+
+  // List of phrases implying AI might mention Google or large team
+  const creatorPhrases = [
+    "who made you",
+    "who created you",
+    "your creator",
+    "who built you",
+    "who's your developer",
+    "google",
+    "large team",
+    "researchers",
+    "openai",
+    "developed by",
+    "made by"
+  ];
+
+  // If prompt includes any phrase implying creator question or mention of Google/teams
   if (creatorPhrases.some(phrase => question.includes(phrase))) {
     return {
       statusCode: 200,
