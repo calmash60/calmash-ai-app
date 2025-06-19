@@ -157,4 +157,3 @@ module.exports = async (req, res) => {
         return res.status(500).json({ success: false, error: error.message || "An internal server error occurred in the backend." });
     }
 };
-          
