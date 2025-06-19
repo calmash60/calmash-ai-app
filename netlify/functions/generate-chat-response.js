@@ -2,11 +2,8 @@
 
 const { GoogleGenerativeAI } = require('@google/generative-ai');
 
-// --- API Keys from Environment Variables ---
-// These are loaded from Netlify's environment settings, not hardcoded here.
-// Key for the default 'calmash 1.0' option (will use gemini-2.0-flash)
-const GEMINI_PRO_API_KEY = process.env.GEMINI_PRO_API_KEY; 
-// Key for the 'calmash 1.0 flash' option (will also use gemini-2.0-flash)
+// --- API Key from Environment Variable ---
+// This function now uses a single environment variable for your Gemini Flash API key.
 const GEMINI_FLASH_API_KEY = process.env.GEMINI_FLASH_API_KEY; 
 
 // Function to initialize the AI model with a specific key and model name
@@ -33,7 +30,9 @@ exports.handler = async function(event, context) {
     }
 
     try {
-        const { chatHistory, selectedModelId, requestType } = JSON.parse(event.body);
+        // We're no longer receiving 'selectedModelId' from the simplified frontend,
+        // so we only extract chatHistory and requestType.
+        const { chatHistory, requestType } = JSON.parse(event.body);
 
         if (!chatHistory || !Array.isArray(chatHistory)) {
             console.error("Invalid request body: chatHistory array expected.");
@@ -43,34 +42,18 @@ exports.handler = async function(event, context) {
             };
         }
 
-        let modelToUse = null; // The actual Gemini model instance
-        const targetModelName = "gemini-2.0-flash"; // Both options use this model
-
-        // Determine which specific Flash API key to use based on the selectedModelId
-        if (selectedModelId === "calmash_1_0_flash") {
-            modelToUse = initializeGeminiModel(GEMINI_FLASH_API_KEY, targetModelName);
-            if (!modelToUse) {
-                // Fallback to the 'pro' named key if 'flash' named key is missing/invalid
-                console.warn("GEMINI_FLASH_API_KEY (for 'calmash 1.0 flash') not configured or invalid. Falling back to GEMINI_PRO_API_KEY.");
-                modelToUse = initializeGeminiModel(GEMINI_PRO_API_KEY, targetModelName);
-            }
-        } else { // Default to 'calmash_1_0' (uses the 'pro' named key)
-            modelToUse = initializeGeminiModel(GEMINI_PRO_API_KEY, targetModelName);
-            if (!modelToUse) {
-                // Fallback to the 'flash' named key if 'pro' named key is missing/invalid
-                console.warn("GEMINI_PRO_API_KEY (for 'calmash 1.0') not configured or invalid. Attempting to use GEMINI_FLASH_API_KEY as last resort.");
-                modelToUse = initializeGeminiModel(GEMINI_FLASH_API_KEY, targetModelName);
-            }
-        }
+        // Always use the GEMINI_FLASH_API_KEY and gemini-2.0-flash model
+        const modelToUse = initializeGeminiModel(GEMINI_FLASH_API_KEY, "gemini-2.0-flash");
+        const currentGeminiModelId = "gemini-2.0-flash"; // Fixed to flash model
 
         if (!modelToUse) {
-            console.error("FATAL ERROR: No valid Gemini Flash API key could be initialized using either GEMINI_PRO_API_KEY or GEMINI_FLASH_API_KEY.");
+            console.error("FATAL ERROR: Gemini Flash API key missing or invalid. Model cannot be initialized.");
             return {
                 statusCode: 500,
-                body: JSON.stringify({ success: false, error: "AI service not configured. Please check your Gemini Flash API keys on Netlify." })
+                body: JSON.stringify({ success: false, error: "AI service not configured. Please ensure GEMINI_FLASH_API_KEY is set correctly on Netlify." })
             };
         }
-        console.log(`Using Gemini model: ${targetModelName}`);
+        console.log(`Using Gemini model: ${currentGeminiModelId} (API key used: GEMINI_FLASH_API_KEY)`);
 
 
         const creatorKeywords = [
@@ -93,7 +76,7 @@ exports.handler = async function(event, context) {
             // Hardcoded response for direct creator questions or follow-ups about calmash1/Grady Hanson
             finalResponseText = "I'm created by calmash1 also known as Grady Hanson.";
         } else if (requestType === 'generateChatName') {
-            // Logic for generating chat name
+            // This path won't be hit with the simplified HTML, but keeping for robustness
             const nameGenerationPrompt = `Summarize the following conversation into a very short, descriptive chat title (max 5 words). Do NOT use quotes in the title.
             Conversation snippet:
             ${chatHistory.map(msg => `${msg.role}: ${msg.parts[0].text}`).join('\n').substring(0, 1000)}
@@ -103,7 +86,6 @@ exports.handler = async function(event, context) {
             const nameApiResponse = nameResult.response;
             let generatedName = nameApiResponse.text().trim();
 
-            // Clean up common AI naming artifacts
             generatedName = generatedName.replace(/^['"]|['"]$/g, ''); // Remove leading/trailing quotes
             generatedName = generatedName.split('\n')[0]; // Take only the first line
 
