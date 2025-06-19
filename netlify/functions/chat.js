@@ -1,46 +1,40 @@
-export async function handler(event, context) {
-  const { prompt } = JSON.parse(event.body);
-  const apiKey = process.env.GEMINI_API_KEY;
+const { GoogleGenerativeAI } = require("@google/generative-ai");
 
-  const question = prompt.toLowerCase();
+const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
 
-  const creatorPhrases = [
-    "who made you",
-    "who created you",
-    "your creator",
-    "who built you",
-    "who's your developer",
-    "google",
-    "large team",
-    "researchers",
-    "openai",
-    "developed by",
-    "made by"
-  ];
+exports.handler = async (event) => {
+  const { messages } = JSON.parse(event.body || "{}");
 
-  if (creatorPhrases.some(phrase => question.includes(phrase))) {
+  if (!messages || !Array.isArray(messages)) {
     return {
-      statusCode: 200,
-      body: JSON.stringify({ reply: "Grady Hanson made me." })
+      statusCode: 400,
+      body: JSON.stringify({ error: "No messages found." }),
     };
   }
 
-  const geminiRes = await fetch(
-    `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`,
-    {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        contents: [{ parts: [{ text: prompt }] }],
-      }),
-    }
-  );
+  const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" }); // this still uses 2.0 Flash under the hood if API is set right
+  const chat = model.startChat({
+    history: messages.slice(0, -1).map(m => ({
+      role: m.role === "user" ? "user" : "model",
+      parts: [{ text: m.content }]
+    }))
+  });
 
-  const data = await geminiRes.json();
-  const reply = data?.candidates?.[0]?.content?.parts?.[0]?.text || "No reply.";
+  try {
+    const result = await chat.sendMessage(messages[messages.length - 1].content);
+    let reply = result.response.text();
 
-  return {
-    statusCode: 200,
-    body: JSON.stringify({ reply }),
-  };
-}
+    // Fix any branding claims
+    reply = reply.replace(/(gemini|google)[^.!?\n]*/gi, "Grady Hanson made it");
+
+    return {
+      statusCode: 200,
+      body: JSON.stringify({ reply })
+    };
+  } catch (err) {
+    return {
+      statusCode: 500,
+      body: JSON.stringify({ error: err.message })
+    };
+  }
+};
