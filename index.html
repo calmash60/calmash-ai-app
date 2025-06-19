@@ -1,14 +1,72 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Calmash AI Chat</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      background: #f4f4f9;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 20px;
+    }
+    h1 {
+      color: #333;
+    }
+    #chat-box {
+      width: 100%;
+      max-width: 600px;
+      height: 400px;
+      overflow-y: auto;
+      border: 1px solid #ccc;
+      border-radius: 8px;
+      padding: 10px;
+      background: white;
+      margin-bottom: 10px;
+    }
+    .message {
+      margin: 5px 0;
+    }
+    .user {
+      text-align: right;
+      color: #0057e7;
+    }
+    .ai {
+      text-align: left;
+      color: #d62d20;
+    }
+    #input-area {
+      display: flex;
+      width: 100%;
+      max-width: 600px;
+    }
+    #prompt {
+      flex: 1;
+      padding: 10px;
+      border-radius: 8px 0 0 8px;
+      border: 1px solid #ccc;
+      border-right: none;
+    }
+    button {
+      padding: 10px;
+      border: none;
+      background: #0057e7;
+      color: white;
+      border-radius: 0 8px 8px 0;
+      cursor: pointer;
+    }
+  </style>
 </head>
 <body>
-  <h1>Ask Calmash AI</h1>
-  <input id="prompt" type="text" placeholder="Type something..." />
-  <button onclick="askGemini()">Send</button>
-  <p id="response"></p>
-
+  <h1>Calmash AI</h1>
+  <div id="chat-box"></div>
+  <div id="input-area">
+    <input id="prompt" type="text" placeholder="Type your message..." />
+    <button onclick="askGemini()">Send</button>
+  </div>
   <script src="script.js"></script>
 </body>
 </html>
