@@ -1,496 +1,103 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<meta charset="UTF-8" />
-<meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>Calmash AI 2.0</title>
-<style>
-  body {
-    margin: 0;
-    font-family: Arial, sans-serif;
-    height: 100vh;
-    display: flex;
-    flex-direction: row;
-    overflow: hidden;
-  }
-  /* Sidebar */
-  #sidebar {
-    background: #1e1e2f;
-    color: white;
-    display: flex;
-    flex-direction: column;
-    width: 280px;
-    min-width: 220px;
-    max-width: 350px;
-    height: 100vh;
-    overflow: hidden;
-  }
-  #sidebar h2 {
-    margin: 1rem;
-    font-weight: normal;
-    font-size: 1.5rem;
-  }
-  #chat-list {
-    flex: 1;
-    overflow-y: auto;
-    padding: 0 1rem;
-  }
-  .chat-item {
-    padding: 0.75rem 0.5rem;
-    border-bottom: 1px solid #333;
-    cursor: pointer;
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-  }
-  .chat-item.active {
-    background: #34344a;
-  }
-  .chat-name {
-    flex-grow: 1;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-  }
-  .chat-name[contenteditable="true"] {
-    outline: 1px solid #0077cc;
-    background: #2a2a44;
-    padding: 2px 4px;
-    border-radius: 4px;
-  }
-  .chat-actions button {
-    background: none;
-    border: none;
-    color: #999;
-    cursor: pointer;
-    font-size: 1.1rem;
-    padding: 0 6px;
-  }
-  #new-chat-btn {
-    background: #0077cc;
-    border: none;
-    color: white;
-    margin: 1rem;
-    padding: 0.5rem;
-    cursor: pointer;
-    border-radius: 5px;
-    font-size: 1rem;
-  }
-  /* Main content */
-  #main {
-    flex: 1;
-    display: flex;
-    flex-direction: column;
-    height: 100vh;
-    overflow: hidden;
-  }
-  /* Chat box */
-  #chat-box {
-    flex-grow: 1;
-    padding: 1rem;
-    overflow-y: auto;
-    background: #f9f9fb;
-    display: flex;
-    flex-direction: column;
-    gap: 0.75rem;
-  }
-  .message {
-    max-width: 75%;
-    word-wrap: break-word;
-    white-space: pre-wrap;
-  }
-  .message.user {
-    text-align: right;
-    margin-left: auto;
-    color: #0077cc;
-  }
-  .message.ai {
-    text-align: left;
-    color: #222;
-  }
-  .code-block {
-    background: #f3f3f3;
-    border: 1px solid #ddd;
-    padding: 10px;
-    border-radius: 5px;
-    white-space: pre-wrap;
-    font-family: monospace;
-    position: relative;
-    margin-top: 0.5rem;
-  }
-  .buttons {
-    display: flex;
-    gap: 10px;
-    margin-top: 5px;
-  }
-  button.copy, button.download, button.preview {
-    font-size: 0.8em;
-    padding: 4px 6px;
-    cursor: pointer;
-  }
-  /* Input area */
-  #input-area {
-    display: flex;
-    padding: 1rem;
-    border-top: 1px solid #ccc;
-    background: white;
-  }
-  #prompt {
-    flex: 1;
-    padding: 10px;
-    border-radius: 8px;
-    border: 1px solid #ccc;
-    font-size: 1rem;
-    min-width: 0;
-  }
-  button.send {
-    background: #0077cc;
-    color: white;
-    border: none;
-    padding: 0 1rem;
-    margin-left: 0.5rem;
-    border-radius: 8px;
-    cursor: pointer;
-  }
-
-  /* Responsive adjustments */
-
-  @media (max-width: 768px) {
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Calmash AI</title>
+  <style>
     body {
+      margin: 0;
+      font-family: Arial, sans-serif;
+      background: #f3f3f3;
+      display: flex;
       flex-direction: column;
+      height: 100vh;
     }
-    #sidebar {
-      width: 100%;
-      height: auto;
-      max-height: 300px;
-      min-width: auto;
+    #chat-box {
+      flex-grow: 1;
+      padding: 1rem;
+      overflow-y: auto;
     }
-    #main {
-      height: calc(100vh - 300px);
+    .message {
+      margin-bottom: 1rem;
+      white-space: pre-wrap;
     }
-  }
-
-  @media (max-width: 480px) {
+    .user { text-align: right; color: #0077cc; }
+    .ai { text-align: left; color: #333; }
+    #input-area {
+      display: flex;
+      padding: 1rem;
+      border-top: 1px solid #ccc;
+      background: #fff;
+    }
     #prompt {
-      font-size: 0.9rem;
-    }
-    #new-chat-btn {
-      font-size: 0.9rem;
-      padding: 0.4rem;
-    }
-    .chat-item {
-      padding: 0.5rem 0.3rem;
-    }
-    .chat-actions button {
+      flex: 1;
+      padding: 0.5rem;
       font-size: 1rem;
-      padding: 0 4px;
     }
-  }
-</style>
+    button {
+      margin-left: 0.5rem;
+      padding: 0.5rem 1rem;
+      font-size: 1rem;
+      background: #0077cc;
+      color: white;
+      border: none;
+      cursor: pointer;
+      border-radius: 4px;
+    }
+  </style>
 </head>
 <body>
 
-<div id="sidebar">
-  <h2>Calmash AI 2.0</h2>
-  <button id="new-chat-btn">+ New Chat</button>
-  <div id="chat-list"></div>
-</div>
-
-<div id="main">
   <div id="chat-box"></div>
+
   <div id="input-area">
-    <input id="prompt" type="text" placeholder="Ask something..." />
-    <button class="send" id="send-btn">Send</button>
+    <input type="text" id="prompt" placeholder="Ask something..." />
+    <button id="send">Send</button>
   </div>
-</div>
 
-<script>
-  // Util: generate simple unique IDs
-  function genId() {
-    return Math.random().toString(36).slice(2, 10);
-  }
+  <script>
+    const chatBox = document.getElementById("chat-box");
+    const promptInput = document.getElementById("prompt");
+    const sendBtn = document.getElementById("send");
 
-  const STORAGE_KEY = "calmash_ai_chats";
-  let chats = [];
-  let currentChatId = null;
+    let messages = [];
 
-  // DOM refs
-  const chatListEl = document.getElementById("chat-list");
-  const chatBoxEl = document.getElementById("chat-box");
-  const promptInput = document.getElementById("prompt");
-  const sendBtn = document.getElementById("send-btn");
-  const newChatBtn = document.getElementById("new-chat-btn");
-
-  // Create new chat with starting AI message
-  function createNewChat() {
-    return {
-      id: genId(),
-      name: "New Chat",
-      messages: [
-        {
-          role: "ai",
-          content: "Hello! I'm Calmash AI. Ask me anything or ask me to write code."
-        }
-      ]
-    };
-  }
-
-  // Load chats from localStorage
-  function loadChats() {
-    const saved = localStorage.getItem(STORAGE_KEY);
-    if (saved) {
-      try {
-        chats = JSON.parse(saved);
-      } catch {
-        chats = [];
+    function render() {
+      chatBox.innerHTML = "";
+      for (const msg of messages) {
+        const div = document.createElement("div");
+        div.className = `message ${msg.role}`;
+        div.textContent = msg.content;
+        chatBox.appendChild(div);
       }
-    } else {
-      chats = [];
+      chatBox.scrollTop = chatBox.scrollHeight;
     }
-    if (chats.length === 0) {
-      chats.push(createNewChat());
-    }
-    currentChatId = chats[0].id;
-    saveChats();
-    renderChatList();
-    renderCurrentChat();
-  }
 
-  // Save chats to localStorage
-  function saveChats() {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(chats));
-  }
+    async function sendMessage() {
+      const input = promptInput.value.trim();
+      if (!input) return;
 
-  // Render chat list sidebar
-  function renderChatList() {
-    chatListEl.innerHTML = "";
-    chats.forEach(chat => {
-      const item = document.createElement("div");
-      item.className = "chat-item" + (chat.id === currentChatId ? " active" : "");
-      item.dataset.id = chat.id;
+      messages.push({ role: "user", content: input });
+      render();
+      promptInput.value = "";
 
-      const name = document.createElement("div");
-      name.className = "chat-name";
-      name.textContent = chat.name;
-      name.contentEditable = false;
-
-      const actions = document.createElement("div");
-      actions.className = "chat-actions";
-
-      // Rename button
-      const renameBtn = document.createElement("button");
-      renameBtn.textContent = "✏️";
-      renameBtn.title = "Rename chat";
-      renameBtn.onclick = (e) => {
-        e.stopPropagation();
-        if (name.contentEditable === "true") {
-          // Save rename
-          name.contentEditable = "false";
-          const trimmed = name.textContent.trim();
-          if (trimmed.length === 0) {
-            name.textContent = chat.name;
-          } else {
-            chat.name = trimmed;
-            saveChats();
-            renderChatList();
-          }
-        } else {
-          // Start rename
-          name.contentEditable = "true";
-          name.focus();
-          document.execCommand('selectAll', false, null);
-        }
-      };
-
-      // Delete button
-      const delBtn = document.createElement("button");
-      delBtn.textContent = "🗑";
-      delBtn.title = "Delete chat";
-      delBtn.onclick = (e) => {
-        e.stopPropagation();
-        deleteChat(chat.id);
-      };
-
-      actions.appendChild(renameBtn);
-      actions.appendChild(delBtn);
-
-      item.appendChild(name);
-      item.appendChild(actions);
-
-      item.onclick = () => {
-        if (chat.id !== currentChatId) {
-          currentChatId = chat.id;
-          renderChatList();
-          renderCurrentChat();
-        }
-      };
-
-      chatListEl.appendChild(item);
-    });
-  }
-
-  // Delete chat by ID
-  function deleteChat(id) {
-    if (confirm("Delete this chat? This cannot be undone.")) {
-      chats = chats.filter(c => c.id !== id);
-      if (chats.length === 0) {
-        // Always keep at least one chat
-        const newChat = createNewChat();
-        chats.push(newChat);
-        currentChatId = newChat.id;
-      } else if (currentChatId === id) {
-        currentChatId = chats[0].id;
-      }
-      saveChats();
-      renderChatList();
-      renderCurrentChat();
-    }
-  }
-
-  // Render current chat messages
-  function renderCurrentChat() {
-    chatBoxEl.innerHTML = "";
-    const chat = chats.find(c => c.id === currentChatId);
-    if (!chat) return;
-
-    chat.messages.forEach(m => {
-      if (m.role === "ai") {
-        // Look for code blocks
-        const codeBlockRegex = /```(\w+)?\n([\s\S]*?)```/;
-        const match = m.content.match(codeBlockRegex);
-
-        if (match) {
-          // Show explanation before code block if any
-          const beforeCode = m.content.split("```")[0].trim();
-          if (beforeCode) {
-            const expl = document.createElement("div");
-            expl.className = "message ai";
-            expl.textContent = beforeCode;
-            chatBoxEl.appendChild(expl);
-          }
-          const lang = match[1] || "txt";
-          const code = match[2];
-          chatBoxEl.appendChild(createCodeUI(code, lang));
-          return;
-        }
-      }
-
-      // Normal message
-      const msgEl = document.createElement("div");
-      msgEl.className = "message " + (m.role === "user" ? "user" : "ai");
-      msgEl.textContent = m.content;
-      chatBoxEl.appendChild(msgEl);
-    });
-
-    chatBoxEl.scrollTop = chatBoxEl.scrollHeight;
-  }
-
-  // Create code UI with copy, download, preview buttons
-  function createCodeUI(code, ext = "txt") {
-    const container = document.createElement("div");
-    container.className = "code-block";
-
-    const pre = document.createElement("pre");
-    pre.textContent = code;
-    container.appendChild(pre);
-
-    const buttons = document.createElement("div");
-    buttons.className = "buttons";
-
-    // Copy
-    const copyBtn = document.createElement("button");
-    copyBtn.textContent = "Copy";
-    copyBtn.className = "copy";
-    copyBtn.onclick = () => navigator.clipboard.writeText(code);
-    buttons.appendChild(copyBtn);
-
-    // Download
-    const downloadBtn = document.createElement("button");
-    downloadBtn.textContent = "Download";
-    downloadBtn.className = "download";
-    downloadBtn.onclick = () => {
-      const blob = new Blob([code], { type: "text/plain" });
-      const link = document.createElement("a");
-      link.href = URL.createObjectURL(blob);
-      link.download = `code.${ext}`;
-      link.click();
-    };
-    buttons.appendChild(downloadBtn);
-
-    // Preview
-    const previewBtn = document.createElement("button");
-    previewBtn.textContent = "Preview";
-    previewBtn.className = "preview";
-    previewBtn.onclick = () => {
-      const win = window.open();
-      if (ext === "html" || ext === "htm") {
-        win.document.write(code);
-      } else {
-        win.document.body.style.whiteSpace = "pre-wrap";
-        win.document.body.style.fontFamily = "monospace";
-        win.document.body.textContent = code;
-      }
-      win.document.close();
-    };
-    buttons.appendChild(previewBtn);
-
-    container.appendChild(buttons);
-    return container;
-  }
-
-  // Send message to backend and update UI
-  async function sendMessage(text) {
-    if (!text.trim()) return;
-
-    const chat = chats.find(c => c.id === currentChatId);
-    if (!chat) return;
-
-    // Add user message
-    chat.messages.push({ role: "user", content: text });
-    saveChats();
-    renderCurrentChat();
-    promptInput.value = "";
-    chatBoxEl.scrollTop = chatBoxEl.scrollHeight;
-
-    try {
       const res = await fetch("/.netlify/functions/chat", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ prompt: text }),
+        body: JSON.stringify({ messages })
       });
+
       const data = await res.json();
-      chat.messages.push({ role: "ai", content: data.reply });
-      saveChats();
-      renderCurrentChat();
-    } catch {
-      chat.messages.push({ role: "ai", content: "Error reaching server." });
-      saveChats();
-      renderCurrentChat();
+      messages.push({ role: "ai", content: data.reply });
+      render();
     }
-  }
 
-  // Event listeners
-  sendBtn.addEventListener("click", () => {
-    sendMessage(promptInput.value);
-  });
-  promptInput.addEventListener("keydown", (e) => {
-    if (e.key === "Enter" && !e.shiftKey) {
-      e.preventDefault();
-      sendMessage(promptInput.value);
-    }
-  });
-  newChatBtn.addEventListener("click", () => {
-    const newChat = createNewChat();
-    chats.unshift(newChat);
-    currentChatId = newChat.id;
-    saveChats();
-    renderChatList();
-    renderCurrentChat();
-  });
-
-  // Initialize
-  loadChats();
-</script>
+    sendBtn.onclick = sendMessage;
+    promptInput.addEventListener("keydown", e => {
+      if (e.key === "Enter") sendMessage();
+    });
+  </script>
 
 </body>
 </html>
