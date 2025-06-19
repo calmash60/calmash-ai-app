@@ -14,6 +14,20 @@ const promptInput = document.getElementById("prompt");
 const sendBtn = document.getElementById("send-btn");
 const newChatBtn = document.getElementById("new-chat-btn");
 
+// Create new chat with starting AI message
+function createNewChat() {
+  return {
+    id: genId(),
+    name: "New Chat",
+    messages: [
+      {
+        role: "ai",
+        content: "Hello! I'm Calmash AI. Ask me anything or ask me to write code."
+      }
+    ]
+  };
+}
+
 // Load chats from localStorage
 function loadChats() {
   const saved = localStorage.getItem(STORAGE_KEY);
@@ -27,9 +41,7 @@ function loadChats() {
     chats = [];
   }
   if (chats.length === 0) {
-    // Create initial chat
-    const chat = { id: genId(), name: "New Chat", messages: [] };
-    chats.push(chat);
+    chats.push(createNewChat());
   }
   currentChatId = chats[0].id;
   saveChats();
@@ -55,32 +67,33 @@ function renderChatList() {
     name.textContent = chat.name;
     name.contentEditable = false;
 
-    // Rename on double-click
-    name.ondblclick = () => {
-      name.contentEditable = true;
-      name.focus();
-    };
-
-    // Save new name on blur or Enter
-    name.onblur = () => {
-      name.contentEditable = false;
-      const trimmed = name.textContent.trim();
-      if (trimmed.length === 0) {
-        name.textContent = chat.name; // revert empty
-      } else {
-        chat.name = trimmed;
-        saveChats();
-      }
-    };
-    name.onkeydown = (e) => {
-      if (e.key === "Enter") {
-        e.preventDefault();
-        name.blur();
-      }
-    };
-
     const actions = document.createElement("div");
     actions.className = "chat-actions";
+
+    // Rename button
+    const renameBtn = document.createElement("button");
+    renameBtn.textContent = "✏️";
+    renameBtn.title = "Rename chat";
+    renameBtn.onclick = (e) => {
+      e.stopPropagation();
+      if (name.contentEditable === "true") {
+        // Save rename
+        name.contentEditable = "false";
+        const trimmed = name.textContent.trim();
+        if (trimmed.length === 0) {
+          name.textContent = chat.name;
+        } else {
+          chat.name = trimmed;
+          saveChats();
+          renderChatList();
+        }
+      } else {
+        // Start rename
+        name.contentEditable = "true";
+        name.focus();
+        document.execCommand('selectAll', false, null);
+      }
+    };
 
     // Delete button
     const delBtn = document.createElement("button");
@@ -91,6 +104,7 @@ function renderChatList() {
       deleteChat(chat.id);
     };
 
+    actions.appendChild(renameBtn);
     actions.appendChild(delBtn);
 
     item.appendChild(name);
@@ -114,7 +128,7 @@ function deleteChat(id) {
     chats = chats.filter(c => c.id !== id);
     if (chats.length === 0) {
       // Always keep at least one chat
-      const newChat = { id: genId(), name: "New Chat", messages: [] };
+      const newChat = createNewChat();
       chats.push(newChat);
       currentChatId = newChat.id;
     } else if (currentChatId === id) {
@@ -133,37 +147,38 @@ function renderCurrentChat() {
   if (!chat) return;
 
   chat.messages.forEach(m => {
+    if (m.role === "ai") {
+      // Look for code blocks
+      const codeBlockRegex = /```(\w+)?\n([\s\S]*?)```/;
+      const match = m.content.match(codeBlockRegex);
+
+      if (match) {
+        // Show explanation before code block if any
+        const beforeCode = m.content.split("```")[0].trim();
+        if (beforeCode) {
+          const expl = document.createElement("div");
+          expl.className = "message ai";
+          expl.textContent = beforeCode;
+          chatBoxEl.appendChild(expl);
+        }
+        const lang = match[1] || "txt";
+        const code = match[2];
+        chatBoxEl.appendChild(createCodeUI(code, lang));
+        return;
+      }
+    }
+
+    // Normal message
     const msgEl = document.createElement("div");
     msgEl.className = "message " + (m.role === "user" ? "user" : "ai");
-
-    // Detect code blocks
-    const codeBlockRegex = /```(\\w+)?\\n([\\s\\S]*?)```/;
-    const match = m.content.match(/```(\w+)?\n([\s\S]*?)```/);
-
-    if (m.role === "ai" && match) {
-      // Show explanation text (if any) before code block
-      const beforeCode = m.content.split("```")[0].trim();
-      if (beforeCode) {
-        const expl = document.createElement("div");
-        expl.textContent = beforeCode;
-        expl.className = "message ai";
-        chatBoxEl.appendChild(expl);
-      }
-
-      // Show code with buttons
-      const lang = match[1] || "txt";
-      const code = match[2];
-      chatBoxEl.appendChild(createCodeUI(code, lang));
-    } else {
-      msgEl.textContent = m.content;
-      chatBoxEl.appendChild(msgEl);
-    }
+    msgEl.textContent = m.content;
+    chatBoxEl.appendChild(msgEl);
   });
 
   chatBoxEl.scrollTop = chatBoxEl.scrollHeight;
 }
 
-// Create code UI with copy, download, preview
+// Create code UI with copy, download, preview buttons
 function createCodeUI(code, ext = "txt") {
   const container = document.createElement("div");
   container.className = "code-block";
@@ -175,14 +190,14 @@ function createCodeUI(code, ext = "txt") {
   const buttons = document.createElement("div");
   buttons.className = "buttons";
 
-  // Copy button
+  // Copy
   const copyBtn = document.createElement("button");
   copyBtn.textContent = "Copy";
   copyBtn.className = "copy";
   copyBtn.onclick = () => navigator.clipboard.writeText(code);
   buttons.appendChild(copyBtn);
 
-  // Download button
+  // Download
   const downloadBtn = document.createElement("button");
   downloadBtn.textContent = "Download";
   downloadBtn.className = "download";
@@ -195,17 +210,15 @@ function createCodeUI(code, ext = "txt") {
   };
   buttons.appendChild(downloadBtn);
 
-  // Preview button
+  // Preview
   const previewBtn = document.createElement("button");
   previewBtn.textContent = "Preview";
   previewBtn.className = "preview";
   previewBtn.onclick = () => {
     const win = window.open();
     if (ext === "html" || ext === "htm") {
-      // Render HTML live
       win.document.write(code);
     } else {
-      // Raw text preview for other languages
       win.document.body.style.whiteSpace = "pre-wrap";
       win.document.body.style.fontFamily = "monospace";
       win.document.body.textContent = code;
@@ -260,7 +273,7 @@ promptInput.addEventListener("keydown", (e) => {
   }
 });
 newChatBtn.addEventListener("click", () => {
-  const newChat = { id: genId(), name: "New Chat", messages: [] };
+  const newChat = createNewChat();
   chats.unshift(newChat);
   currentChatId = newChat.id;
   saveChats();
@@ -268,5 +281,5 @@ newChatBtn.addEventListener("click", () => {
   renderCurrentChat();
 });
 
-// Init
+// Initialize
 loadChats();
