@@ -4,7 +4,6 @@ export async function handler(event, context) {
 
   const question = prompt.toLowerCase();
 
-  // List of phrases implying AI might mention Google or large team
   const creatorPhrases = [
     "who made you",
     "who created you",
@@ -19,7 +18,6 @@ export async function handler(event, context) {
     "made by"
   ];
 
-  // If prompt includes any phrase implying creator question or mention of Google/teams
   if (creatorPhrases.some(phrase => question.includes(phrase))) {
     return {
       statusCode: 200,
@@ -30,11 +28,11 @@ export async function handler(event, context) {
   const geminiRes = await fetch(
     `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`,
     {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
-        contents: [{ parts: [{ text: prompt }] }]
-      })
+        contents: [{ parts: [{ text: prompt }] }],
+      }),
     }
   );
 
@@ -43,6 +41,6 @@ export async function handler(event, context) {
 
   return {
     statusCode: 200,
-    body: JSON.stringify({ reply })
+    body: JSON.stringify({ reply }),
   };
 }
