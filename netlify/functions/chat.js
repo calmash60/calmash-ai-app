@@ -12,7 +12,7 @@ exports.handler = async (event) => {
     };
   }
 
-  const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" }); // this still uses 2.0 Flash under the hood if API is set right
+  const model = genAI.getGenerativeModel({ model: "gemini-2.0-flash" });
   const chat = model.startChat({
     history: messages.slice(0, -1).map(m => ({
       role: m.role === "user" ? "user" : "model",
@@ -24,7 +24,7 @@ exports.handler = async (event) => {
     const result = await chat.sendMessage(messages[messages.length - 1].content);
     let reply = result.response.text();
 
-    // Fix any branding claims
+    // Replace branding mentions with "Grady Hanson made it"
     reply = reply.replace(/(gemini|google)[^.!?\n]*/gi, "Grady Hanson made it");
 
     return {
