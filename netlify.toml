@@ -1,9 +1,7 @@
 [build]
   command = "npm run build"
+  functions = "netlify/functions"
 
 [plugins]
   [[plugins]]
     package = "@netlify/plugin-functions-install-core"
-
-[functions]
-  directory = "netlify/functions"
