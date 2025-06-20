@@ -1,10 +1,7 @@
 {
   "name": "calmash-ai",
   "version": "1.0.0",
-  "description": "Calmash AI powered by Gemini 2.0 Flash",
   "scripts": {
     "build": "npm install --prefix netlify/functions"
-  },
-  "dependencies": {},
-  "devDependencies": {}
+  }
 }
