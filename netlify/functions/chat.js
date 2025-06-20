@@ -24,7 +24,6 @@ exports.handler = async (event) => {
     const result = await chat.sendMessage(messages[messages.length - 1].content);
     let reply = result.response.text();
 
-    // Replace branding mentions with "Grady Hanson made it"
     reply = reply.replace(/(gemini|google)[^.!?\n]*/gi, "Grady Hanson made it");
 
     return {
