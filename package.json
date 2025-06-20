@@ -2,8 +2,8 @@
   "name": "calmash-ai",
   "version": "1.0.0",
   "description": "Calmash AI powered by Gemini 2.0 Flash",
-  "main": "index.js",
-  "dependencies": {
-    "@google/generative-ai": "^0.5.0"
-  }
+  "scripts": {
+    "build": "npm install --prefix netlify/functions"
+  },
+  "dependencies": {}
 }
