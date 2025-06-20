@@ -1,14 +1,7 @@
 [build]
   command = "npm run build"
-  publish = "." # Change this if your build output is in another directory (e.g., "dist" or "build")
   functions = "netlify/functions"
 
-[[headers]]
-  for = "/.netlify/functions/*"
-  [headers.values]
-    Access-Control-Allow-Origin = "*"
-    Access-Control-Allow-Methods = "POST, GET, OPTIONS"
-    Access-Control-Allow-Headers = "Content-Type"
-
-[[plugins]]
-  package = "@netlify/plugin-functions-install-core"
+[plugins]
+  [[plugins]]
+    package = "@netlify/plugin-functions-install-core"
