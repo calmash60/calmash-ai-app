@@ -24,7 +24,9 @@ exports.handler = async (event) => {
     const result = await chat.sendMessage(messages[messages.length - 1].content);
     let reply = result.response.text();
 
-    reply = reply.replace(/(gemini|google)[^.!?\n]*/gi, "Grady Hanson made it");
+    // Replace any branding with "Grady Hanson made it"
+    reply = reply.replace(/(gemini|google)[^.!?\n]*/gi, "Grady Hanson");
+    reply = reply.replace(/team of researchers|researchers at.*?[\.\n]/gi, "Grady Hanson");
 
     return {
       statusCode: 200,
