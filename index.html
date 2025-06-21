@@ -5,51 +5,158 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <title>Calmash AI</title>
   <style>
-    body { margin: 0; font-family: Arial, sans-serif; height: 100vh; display: flex; }
-    #sidebar { width: 250px; background: #1e1e1e; color: white; display: flex; flex-direction: column; }
+    :root {
+      --sidebar-bg: #1e1e1e;
+      --sidebar-text: #fff;
+      --main-bg: #f3f3f3;
+      --ai-color: #333;
+      --user-color: #0077cc;
+      --active-chat: #0077cc;
+      --chat-bg: #333;
+      --chat-hover: #555;
+      --error-bg: #ffe0e0;
+      --error-text: #b00020;
+      --loading-bg: #eee;
+      --dark-main-bg: #222;
+      --dark-sidebar-bg: #181818;
+      --dark-chat-bg: #222;
+      --dark-ai-color: #eee;
+      --dark-user-color: #3ca0ff;
+    }
+    body {
+      margin: 0;
+      font-family: Arial, sans-serif;
+      height: 100vh;
+      display: flex;
+      background: var(--main-bg);
+      color: var(--ai-color);
+      transition: background 0.2s, color 0.2s;
+    }
+    #sidebar {
+      width: 250px;
+      background: var(--sidebar-bg);
+      color: var(--sidebar-text);
+      display: flex;
+      flex-direction: column;
+      transition: background 0.2s, color 0.2s;
+    }
     #sidebar h2 { text-align: center; margin: 1rem 0; }
     #chat-list { flex: 1; overflow-y: auto; padding: 0.5rem; }
-    .chat-item { padding: 0.5rem; background: #333; margin-bottom: 0.5rem; cursor: pointer; border-radius: 4px; }
-    .chat-item.active { background: #0077cc; }
-    .chat-item:hover { background: #555; }
+    .chat-item { padding: 0.5rem; background: var(--chat-bg); margin-bottom: 0.5rem; cursor: pointer; border-radius: 4px; }
+    .chat-item.active { background: var(--active-chat); }
+    .chat-item:hover { background: var(--chat-hover); }
     .chat-actions { display: flex; justify-content: space-between; margin-top: 0.3rem; }
-    #main { flex: 1; display: flex; flex-direction: column; background: #f3f3f3; }
+    #main {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      background: var(--main-bg);
+      transition: background 0.2s;
+    }
     #chat-box { flex: 1; padding: 1rem; overflow-y: auto; }
-    .message { margin-bottom: 1rem; white-space: pre-wrap; }
-    .user { text-align: right; color: #0077cc; }
-    .ai { text-align: left; color: #333; }
+    .message { margin-bottom: 1rem; white-space: pre-wrap; position: relative; }
+    .user { text-align: right; color: var(--user-color); }
+    .ai { text-align: left; color: var(--ai-color); }
     pre { background: #eee; padding: 0.5rem; border-radius: 4px; position: relative; overflow-x: auto; }
     .code-actions { display: flex; gap: 8px; margin-top: 0.3rem; }
     .code-actions button { font-size: 0.8rem; }
     #input-area { display: flex; padding: 1rem; border-top: 1px solid #ccc; background: #fff; }
     #user-prompt { flex: 1; padding: 0.5rem; font-size: 1rem; }
-    button { padding: 0.5rem 1rem; font-size: 1rem; background: #0077cc; color: white; border: none; cursor: pointer; border-radius: 4px; margin-left: 0.5rem; }
-    @media (max-width: 700px) { #sidebar { width: 100px; } .chat-item { font-size: 0.8rem; } }
+    button {
+      padding: 0.5rem 1rem; font-size: 1rem; background: var(--active-chat); color: white;
+      border: none; cursor: pointer; border-radius: 4px; margin-left: 0.5rem;
+    }
+    .edit-btn, .delete-msg-btn {
+      background: #fff !important;
+      color: #0077cc !important;
+      border: 1px solid #0077cc;
+      margin-left: 0.3rem;
+    }
+    .edit-btn:hover, .delete-msg-btn:hover { background: #eee !important; }
+    .error-banner {
+      background: var(--error-bg);
+      color: var(--error-text);
+      padding: 0.5rem;
+      text-align: center;
+      border-bottom: 1px solid var(--error-text);
+      font-weight: bold;
+      display: none;
+    }
+    .loading-indicator {
+      display: none;
+      text-align: center;
+      color: #888;
+      background: var(--loading-bg);
+      padding: 0.5rem 0;
+    }
+    .placeholder {
+      color: #888;
+      text-align: center;
+      margin-top: 2rem;
+      font-size: 1.2rem;
+    }
+    .dark-mode {
+      --main-bg: var(--dark-main-bg);
+      --sidebar-bg: var(--dark-sidebar-bg);
+      --ai-color: var(--dark-ai-color);
+      --user-color: var(--dark-user-color);
+      --chat-bg: var(--dark-chat-bg);
+      --chat-hover: #333;
+      background: var(--dark-main-bg) !important;
+      color: var(--dark-ai-color) !important;
+    }
+    #dark-toggle {
+      background: #444;
+      color: #fff;
+      font-size: 1.1rem;
+      border: none;
+      border-radius: 4px;
+      margin: 0.5rem;
+      transition: background 0.2s, color 0.2s;
+    }
+    @media (max-width: 700px) {
+      #sidebar { width: 100px; }
+      .chat-item { font-size: 0.8rem; }
+    }
   </style>
 </head>
 <body>
-
-<div id="sidebar">
+<div id="sidebar" role="navigation" aria-label="Chat navigation">
   <h2>Calmash AI</h2>
-  <button onclick="newChat()">➕ New Chat</button>
+  <button onclick="newChat()" aria-label="Create a new chat">➕ New Chat</button>
+  <button id="export-history" aria-label="Export chat history">⬇️ Export</button>
+  <button id="dark-toggle" aria-label="Toggle dark mode">🌙 Dark Mode</button>
   <div id="chat-list"></div>
 </div>
 
 <div id="main">
-  <div id="chat-box"></div>
+  <div class="error-banner" id="error-banner"></div>
+  <div class="loading-indicator" id="loading-indicator">Loading...</div>
+  <div id="chat-box" role="main" aria-live="polite"></div>
   <div id="input-area">
-    <input type="file" id="fileInput" />
-    <input type="text" id="user-prompt" placeholder="Ask something..." />
-    <button id="send">Send</button>
+    <input type="file" id="fileInput" aria-label="Upload file" />
+    <input type="text" id="user-prompt" placeholder="Ask something..." aria-label="Chat input"/>
+    <button id="send" aria-label="Send message">Send</button>
   </div>
 </div>
 
 <script>
+  // Accessibility and theming
+  const darkToggle = document.getElementById('dark-toggle');
+  darkToggle.onclick = function () {
+    document.body.classList.toggle('dark-mode');
+    localStorage.setItem('calmash_dark', document.body.classList.contains('dark-mode'));
+  };
+  if (localStorage.getItem('calmash_dark') === 'true') document.body.classList.add('dark-mode');
+
   const chatBox = document.getElementById("chat-box");
   const promptInput = document.getElementById("user-prompt");
   const fileInput = document.getElementById("fileInput");
   const sendBtn = document.getElementById("send");
   const chatListEl = document.getElementById("chat-list");
+  const errorBanner = document.getElementById("error-banner");
+  const loadingIndicator = document.getElementById("loading-indicator");
+  const exportBtn = document.getElementById("export-history");
 
   let chats = JSON.parse(localStorage.getItem("calmash_chats") || "{}");
   let currentChatId = localStorage.getItem("calmash_current") || createChat();
@@ -103,11 +210,14 @@
     for (const id in chats) {
       const div = document.createElement("div");
       div.className = "chat-item" + (id === currentChatId ? " active" : "");
+      div.setAttribute('tabindex', 0);
+      div.setAttribute('role', 'button');
+      div.setAttribute('aria-label', `Switch to chat: ${chats[id].name}`);
       div.innerHTML = `
         <div onclick="switchChat('${id}')">${chats[id].name}</div>
         <div class="chat-actions">
-          <button onclick="event.stopPropagation(); renameChat('${id}')">✏️</button>
-          <button onclick="event.stopPropagation(); deleteChat('${id}')">🗑️</button>
+          <button onclick="event.stopPropagation(); renameChat('${id}')" aria-label="Rename chat">✏️</button>
+          <button onclick="event.stopPropagation(); deleteChat('${id}')" aria-label="Delete chat">🗑️</button>
         </div>
       `;
       chatListEl.appendChild(div);
@@ -116,11 +226,16 @@
 
   function render() {
     chatBox.innerHTML = "";
+    errorBanner.style.display = "none";
     const messages = chats[currentChatId]?.messages || [];
-    for (const msg of messages) {
+    if (messages.length === 0) {
+      chatBox.innerHTML = '<div class="placeholder">Start a new chat or select an existing one.</div>';
+      return;
+    }
+    messages.forEach((msg, idx) => {
       const div = document.createElement("div");
       div.className = `message ${msg.role}`;
-
+      // Code block highlighting and code actions
       if (/```(.+)?\n([\s\S]+?)```/g.test(msg.content)) {
         div.innerHTML = msg.content.replace(/```(\w+)?\n([\s\S]+?)```/g, (_, lang, code) => {
           const ext = lang ? '.' + lang.trim() : '.txt';
@@ -128,18 +243,51 @@
           return `
             <pre><code>${code.trim()}</code></pre>
             <div class="code-actions">
-              <button onclick="copyCode('${encoded}')">📋 Copy</button>
-              <button onclick="downloadCode('${encoded}', '${ext}')">💾 Download</button>
-              <button onclick="previewCode('${encoded}', '${lang || 'html'}')">👁 Preview</button>
+              <button onclick="copyCode('${encoded}')" aria-label="Copy code">📋 Copy</button>
+              <button onclick="downloadCode('${encoded}', '${ext}')" aria-label="Download code">💾 Download</button>
+              <button onclick="previewCode('${encoded}', '${lang || 'html'}')" aria-label="Preview code">👁 Preview</button>
             </div>`;
         });
       } else {
         div.textContent = msg.content;
       }
+      // Edit and Delete buttons for messages
+      if (msg.role === 'user') {
+        const editBtn = document.createElement('button');
+        editBtn.innerText = 'Edit';
+        editBtn.className = 'edit-btn';
+        editBtn.onclick = () => editMessage(idx);
+        editBtn.setAttribute('aria-label', 'Edit message');
+        div.appendChild(editBtn);
 
+        const delBtn = document.createElement('button');
+        delBtn.innerText = 'Delete';
+        delBtn.className = 'delete-msg-btn';
+        delBtn.onclick = () => deleteMessage(idx);
+        delBtn.setAttribute('aria-label', 'Delete message');
+        div.appendChild(delBtn);
+      }
       chatBox.appendChild(div);
-    }
+    });
     chatBox.scrollTop = chatBox.scrollHeight;
+  }
+
+  function editMessage(idx) {
+    const chat = chats[currentChatId];
+    const newMsg = prompt('Edit your message:', chat.messages[idx].content);
+    if (newMsg !== null) {
+      chat.messages[idx].content = newMsg;
+      saveChats();
+      render();
+    }
+  }
+  function deleteMessage(idx) {
+    const chat = chats[currentChatId];
+    if (confirm('Delete this message?')) {
+      chat.messages.splice(idx, 1);
+      saveChats();
+      render();
+    }
   }
 
   function copyCode(encoded) {
@@ -158,25 +306,26 @@
   function previewCode(encoded, lang) {
     const code = decodeURIComponent(encoded);
     const win = window.open();
-    // Security note: For HTML, this could be unsafe if content is not trusted.
+    // Use a sandboxed iframe for HTML preview (security)
     if (lang === "html") {
-      win.document.write(code);
+      win.document.write(`<iframe sandbox="allow-scripts" style="width:100vw;height:100vh;border:0;" srcdoc="${code.replace(/"/g, '&quot;')}"></iframe>`);
     } else {
-      win.document.write("<pre>" + code + "</pre>");
+      win.document.write("<pre>" + code.replace(/</g, "&lt;") + "</pre>");
     }
   }
 
   async function sendMessage() {
+    errorBanner.style.display = "none";
     const input = promptInput.value.trim();
     if (!input && !fileInput.files.length) return;
 
     const chat = chats[currentChatId];
-    if (input) chat.messages.push({ role: "user", content: input });
+    if (input) chat.messages.push({ role: "user", content: sanitize(input) });
 
     if (fileInput.files.length) {
       const reader = new FileReader();
       reader.onload = function (e) {
-        chat.messages.push({ role: "user", content: e.target.result });
+        chat.messages.push({ role: "user", content: sanitize(e.target.result) });
         sendToServer(chat);
       };
       reader.readAsText(fileInput.files[0]);
@@ -190,23 +339,34 @@
   }
 
   async function sendToServer(chat) {
+    loadingIndicator.style.display = 'block';
     try {
       const res = await fetch("/.netlify/functions/chat", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ messages: chat.messages })
       });
-
       if (!res.ok) throw new Error("Network error");
-
       const data = await res.json();
-      chat.messages.push({ role: "ai", content: data.reply });
+      chat.messages.push({ role: "ai", content: sanitize(data.reply) });
       render();
       saveChats();
     } catch (e) {
       chat.messages.push({ role: "ai", content: "Error: " + e.message });
+      errorBanner.innerText = "Error: " + e.message;
+      errorBanner.style.display = "block";
       render();
+    } finally {
+      loadingIndicator.style.display = 'none';
     }
+  }
+
+  // Sanitize input to prevent XSS
+  function sanitize(str) {
+    return String(str)
+      .replace(/&/g, "&amp;")
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;");
   }
 
   sendBtn.onclick = sendMessage;
@@ -214,10 +374,15 @@
     if (e.key === "Enter") sendMessage();
   });
 
-  renderChatList();
-  render();
+  exportBtn.onclick = function() {
+    const blob = new Blob([JSON.stringify(chats, null, 2)], { type: "application/json" });
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(blob);
+    a.download = "calmash_chat_history.json";
+    a.click();
+  };
 
-  // Expose functions globally for inline onclick handlers in HTML
+  // Expose functions for inline handlers
   window.newChat = newChat;
   window.switchChat = switchChat;
   window.renameChat = renameChat;
@@ -225,7 +390,9 @@
   window.copyCode = copyCode;
   window.downloadCode = downloadCode;
   window.previewCode = previewCode;
-</script>
 
+  renderChatList();
+  render();
+</script>
 </body>
 </html>
