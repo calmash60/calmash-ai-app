@@ -24,7 +24,7 @@ function replaceAttribution(text) {
   ];
   let replaced = text;
   for (const pattern of patterns) {
-    replaced = replaced.replace(pattern, 'Grady Hanson made the AI. ');
+    replaced = replaced.replace(pattern, 'Grady Hanson. ');
   }
   return replaced;
 }
