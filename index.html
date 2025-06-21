@@ -4,6 +4,8 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <title>Calmash AI</title>
+  <!-- DOMPurify for security -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/dompurify/3.0.9/purify.min.js" integrity="sha512-6kSmt1KXn+K3qBXXwN8mD3kT2G1K8A3u3S4F2lBWD3v0JZ71gq6b4n8+qJXjK6z1Jq3lXQkzvK8oW9z2x6bK8A==" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
   <style>
     :root {
       --sidebar-bg: #1e1e1e;
@@ -22,6 +24,7 @@
       --dark-chat-bg: #222;
       --dark-ai-color: #eee;
       --dark-user-color: #3ca0ff;
+      --focus-outline: 2px solid #3ca0ff;
     }
     body {
       margin: 0;
@@ -42,10 +45,14 @@
     }
     #sidebar h2 { text-align: center; margin: 1rem 0; }
     #chat-list { flex: 1; overflow-y: auto; padding: 0.5rem; }
-    .chat-item { padding: 0.5rem; background: var(--chat-bg); margin-bottom: 0.5rem; cursor: pointer; border-radius: 4px; }
+    .chat-item {
+      padding: 0.5rem; background: var(--chat-bg); margin-bottom: 0.5rem; cursor: pointer; border-radius: 4px;
+      outline: none;
+    }
     .chat-item.active { background: var(--active-chat); }
+    .chat-item:focus { outline: var(--focus-outline); }
     .chat-item:hover { background: var(--chat-hover); }
-    .chat-actions { display: flex; justify-content: space-between; margin-top: 0.3rem; }
+    .chat-actions { display: flex; justify-content: space-between; margin-top: 0.3rem; gap: 0.3rem;}
     #main {
       flex: 1;
       display: flex;
@@ -65,7 +72,9 @@
     button {
       padding: 0.5rem 1rem; font-size: 1rem; background: var(--active-chat); color: white;
       border: none; cursor: pointer; border-radius: 4px; margin-left: 0.5rem;
+      transition: background 0.2s, color 0.2s;
     }
+    button:focus { outline: var(--focus-outline); }
     .edit-btn, .delete-msg-btn {
       background: #fff !important;
       color: #0077cc !important;
@@ -123,12 +132,11 @@
 <body>
 <div id="sidebar" role="navigation" aria-label="Chat navigation">
   <h2>Calmash AI</h2>
-  <button onclick="newChat()" aria-label="Create a new chat">➕ New Chat</button>
+  <button id="new-chat" aria-label="Create a new chat">➕ New Chat</button>
   <button id="export-history" aria-label="Export chat history">⬇️ Export</button>
   <button id="dark-toggle" aria-label="Toggle dark mode">🌙 Dark Mode</button>
   <div id="chat-list"></div>
 </div>
-
 <div id="main">
   <div class="error-banner" id="error-banner"></div>
   <div class="loading-indicator" id="loading-indicator">Loading...</div>
@@ -139,14 +147,13 @@
     <button id="send" aria-label="Send message">Send</button>
   </div>
 </div>
-
 <script>
   // Accessibility and theming
   const darkToggle = document.getElementById('dark-toggle');
-  darkToggle.onclick = function () {
+  darkToggle.addEventListener('click', () => {
     document.body.classList.toggle('dark-mode');
     localStorage.setItem('calmash_dark', document.body.classList.contains('dark-mode'));
-  };
+  });
   if (localStorage.getItem('calmash_dark') === 'true') document.body.classList.add('dark-mode');
 
   const chatBox = document.getElementById("chat-box");
@@ -157,7 +164,9 @@
   const errorBanner = document.getElementById("error-banner");
   const loadingIndicator = document.getElementById("loading-indicator");
   const exportBtn = document.getElementById("export-history");
+  const newChatBtn = document.getElementById("new-chat");
 
+  // Chat data
   let chats = JSON.parse(localStorage.getItem("calmash_chats") || "{}");
   let currentChatId = localStorage.getItem("calmash_current") || createChat();
 
@@ -187,11 +196,20 @@
   }
 
   function renameChat(id) {
-    const name = window.prompt("Rename chat:", chats[id].name);
-    if (name) {
-      chats[id].name = name;
-      saveChats();
+    const oldName = chats[id].name;
+    let name = window.prompt("Rename chat:", oldName);
+    if (name === null) return; // Cancelled
+    name = name.trim();
+    if (!name) {
+      alert("Chat name cannot be empty.");
+      return;
     }
+    if (name.length > 30) {
+      alert("Chat name too long (max 30 characters).");
+      return;
+    }
+    chats[id].name = name;
+    saveChats();
   }
 
   function deleteChat(id) {
@@ -207,21 +225,54 @@
 
   function renderChatList() {
     chatListEl.innerHTML = "";
-    for (const id in chats) {
+    Object.entries(chats).forEach(([id, chat]) => {
       const div = document.createElement("div");
       div.className = "chat-item" + (id === currentChatId ? " active" : "");
       div.setAttribute('tabindex', 0);
       div.setAttribute('role', 'button');
-      div.setAttribute('aria-label', `Switch to chat: ${chats[id].name}`);
-      div.innerHTML = `
-        <div onclick="switchChat('${id}')">${chats[id].name}</div>
-        <div class="chat-actions">
-          <button onclick="event.stopPropagation(); renameChat('${id}')" aria-label="Rename chat">✏️</button>
-          <button onclick="event.stopPropagation(); deleteChat('${id}')" aria-label="Delete chat">🗑️</button>
-        </div>
-      `;
+      div.setAttribute('aria-label', `Switch to chat: ${chat.name}`);
+      // Chat title
+      const titleDiv = document.createElement('div');
+      titleDiv.textContent = chat.name;
+      titleDiv.className = "chat-title";
+      // Actions
+      const actionsDiv = document.createElement('div');
+      actionsDiv.className = "chat-actions";
+      // Rename
+      const renameBtn = document.createElement('button');
+      renameBtn.type = "button";
+      renameBtn.innerText = '✏️';
+      renameBtn.className = 'edit-btn';
+      renameBtn.setAttribute('aria-label', 'Rename chat');
+      renameBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        renameChat(id);
+      });
+      // Delete
+      const delBtn = document.createElement('button');
+      delBtn.type = "button";
+      delBtn.innerText = '🗑️';
+      delBtn.className = 'delete-msg-btn';
+      delBtn.setAttribute('aria-label', 'Delete chat');
+      delBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        deleteChat(id);
+      });
+      actionsDiv.appendChild(renameBtn);
+      actionsDiv.appendChild(delBtn);
+
+      div.appendChild(titleDiv);
+      div.appendChild(actionsDiv);
+
+      div.addEventListener('click', () => switchChat(id));
+      div.addEventListener('keydown', e => {
+        if (e.key === 'Enter' || e.key === ' ') {
+          e.preventDefault();
+          switchChat(id);
+        }
+      });
       chatListEl.appendChild(div);
-    }
+    });
   }
 
   function render() {
@@ -236,35 +287,41 @@
       const div = document.createElement("div");
       div.className = `message ${msg.role}`;
       // Code block highlighting and code actions
-      if (/```(.+)?\n([\s\S]+?)```/g.test(msg.content)) {
-        div.innerHTML = msg.content.replace(/```(\w+)?\n([\s\S]+?)```/g, (_, lang, code) => {
-          const ext = lang ? '.' + lang.trim() : '.txt';
-          const encoded = encodeURIComponent(code.trim());
-          return `
-            <pre><code>${code.trim()}</code></pre>
-            <div class="code-actions">
-              <button onclick="copyCode('${encoded}')" aria-label="Copy code">📋 Copy</button>
-              <button onclick="downloadCode('${encoded}', '${ext}')" aria-label="Download code">💾 Download</button>
-              <button onclick="previewCode('${encoded}', '${lang || 'html'}')" aria-label="Preview code">👁 Preview</button>
-            </div>`;
-        });
+      const codeBlockRegex = /```(\w+)?\n([\s\S]+?)```/g;
+      if (codeBlockRegex.test(msg.content)) {
+        // For each code block
+        div.innerHTML = DOMPurify.sanitize(
+          msg.content.replace(codeBlockRegex, (_, lang, code) => {
+            const ext = lang ? '.' + lang.trim() : '.txt';
+            const encoded = encodeURIComponent(code.trim());
+            return `
+              <pre><code>${DOMPurify.sanitize(code.trim())}</code></pre>
+              <div class="code-actions">
+                <button type="button" data-action="copy" data-code="${encoded}" aria-label="Copy code">📋 Copy</button>
+                <button type="button" data-action="download" data-code="${encoded}" data-ext="${ext}" aria-label="Download code">💾 Download</button>
+                <button type="button" data-action="preview" data-code="${encoded}" data-lang="${lang || 'html'}" aria-label="Preview code">👁 Preview</button>
+              </div>`;
+          })
+        );
       } else {
         div.textContent = msg.content;
       }
-      // Edit and Delete buttons for messages
+      // Edit and Delete buttons for messages (user messages only)
       if (msg.role === 'user') {
         const editBtn = document.createElement('button');
+        editBtn.type = "button";
         editBtn.innerText = 'Edit';
         editBtn.className = 'edit-btn';
-        editBtn.onclick = () => editMessage(idx);
         editBtn.setAttribute('aria-label', 'Edit message');
+        editBtn.addEventListener('click', () => editMessage(idx));
         div.appendChild(editBtn);
 
         const delBtn = document.createElement('button');
+        delBtn.type = "button";
         delBtn.innerText = 'Delete';
         delBtn.className = 'delete-msg-btn';
-        delBtn.onclick = () => deleteMessage(idx);
         delBtn.setAttribute('aria-label', 'Delete message');
+        delBtn.addEventListener('click', () => deleteMessage(idx));
         div.appendChild(delBtn);
       }
       chatBox.appendChild(div);
@@ -274,9 +331,10 @@
 
   function editMessage(idx) {
     const chat = chats[currentChatId];
-    const newMsg = prompt('Edit your message:', chat.messages[idx].content);
-    if (newMsg !== null) {
-      chat.messages[idx].content = newMsg;
+    const oldMsg = chat.messages[idx].content;
+    const newMsg = prompt('Edit your message:', oldMsg);
+    if (newMsg !== null && newMsg.trim().length > 0) {
+      chat.messages[idx].content = newMsg.trim();
       saveChats();
       render();
     }
@@ -290,42 +348,59 @@
     }
   }
 
-  function copyCode(encoded) {
-    navigator.clipboard.writeText(decodeURIComponent(encoded));
-    alert("Copied to clipboard!");
-  }
+  // Event delegation for code actions
+  chatBox.addEventListener('click', function(e) {
+    const btn = e.target.closest('button[data-action]');
+    if (!btn) return;
+    const code = decodeURIComponent(btn.getAttribute('data-code'));
+    const action = btn.getAttribute('data-action');
+    if (action === 'copy') {
+      navigator.clipboard.writeText(code);
+      alert("Copied to clipboard!");
+    } else if (action === 'download') {
+      const ext = btn.getAttribute('data-ext') || '.txt';
+      const blob = new Blob([code], { type: "text/plain" });
+      const a = document.createElement("a");
+      const url = URL.createObjectURL(blob);
+      a.href = url;
+      a.download = "code" + ext;
+      document.body.appendChild(a);
+      a.click();
+      setTimeout(() => {
+        URL.revokeObjectURL(url);
+        document.body.removeChild(a);
+      }, 100);
+    } else if (action === 'preview') {
+      const lang = btn.getAttribute('data-lang');
+      previewCode(code, lang);
+    }
+  });
 
-  function downloadCode(encoded, ext) {
-    const blob = new Blob([decodeURIComponent(encoded)], { type: "text/plain" });
-    const a = document.createElement("a");
-    a.href = URL.createObjectURL(blob);
-    a.download = "code" + ext;
-    a.click();
-  }
-
-  function previewCode(encoded, lang) {
-    const code = decodeURIComponent(encoded);
-    const win = window.open();
-    // Use a sandboxed iframe for HTML preview (security)
+  function previewCode(code, lang) {
+    const win = window.open("", "_blank", "noopener");
     if (lang === "html") {
-      win.document.write(`<iframe sandbox="allow-scripts" style="width:100vw;height:100vh;border:0;" srcdoc="${code.replace(/"/g, '&quot;')}"></iframe>`);
+      const safe = code.replace(/"/g, '&quot;'); // basic sanitization
+      win.document.write(`<iframe sandbox="allow-scripts" style="width:100vw;height:100vh;border:0;" srcdoc="${safe}"></iframe>`);
     } else {
-      win.document.write("<pre>" + code.replace(/</g, "&lt;") + "</pre>");
+      win.document.write("<pre>" + DOMPurify.sanitize(code).replace(/</g, "&lt;") + "</pre>");
     }
   }
 
   async function sendMessage() {
     errorBanner.style.display = "none";
     const input = promptInput.value.trim();
-    if (!input && !fileInput.files.length) return;
-
+    if (!input && !fileInput.files.length) {
+      errorBanner.innerText = "Input is empty.";
+      errorBanner.style.display = "block";
+      return;
+    }
     const chat = chats[currentChatId];
-    if (input) chat.messages.push({ role: "user", content: sanitize(input) });
+    if (input) chat.messages.push({ role: "user", content: input });
 
     if (fileInput.files.length) {
       const reader = new FileReader();
       reader.onload = function (e) {
-        chat.messages.push({ role: "user", content: sanitize(e.target.result) });
+        chat.messages.push({ role: "user", content: e.target.result });
         sendToServer(chat);
       };
       reader.readAsText(fileInput.files[0]);
@@ -346,9 +421,16 @@
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ messages: chat.messages })
       });
-      if (!res.ok) throw new Error("Network error");
-      const data = await res.json();
-      chat.messages.push({ role: "ai", content: sanitize(data.reply) });
+      let data;
+      try {
+        data = await res.json();
+      } catch (err) {
+        throw new Error("Invalid server response.");
+      }
+      if (!res.ok) {
+        throw new Error(data?.error || "Network error");
+      }
+      chat.messages.push({ role: "ai", content: data.reply });
       render();
       saveChats();
     } catch (e) {
@@ -361,36 +443,43 @@
     }
   }
 
-  // Sanitize input to prevent XSS
-  function sanitize(str) {
-    return String(str)
-      .replace(/&/g, "&amp;")
-      .replace(/</g, "&lt;")
-      .replace(/>/g, "&gt;");
-  }
-
-  sendBtn.onclick = sendMessage;
+  // Button/event wiring
+  sendBtn.addEventListener("click", sendMessage);
   promptInput.addEventListener("keydown", e => {
     if (e.key === "Enter") sendMessage();
   });
-
-  exportBtn.onclick = function() {
+  exportBtn.addEventListener("click", function() {
     const blob = new Blob([JSON.stringify(chats, null, 2)], { type: "application/json" });
     const a = document.createElement("a");
-    a.href = URL.createObjectURL(blob);
+    const url = URL.createObjectURL(blob);
+    a.href = url;
     a.download = "calmash_chat_history.json";
+    document.body.appendChild(a);
     a.click();
-  };
+    setTimeout(() => {
+      URL.revokeObjectURL(url);
+      document.body.removeChild(a);
+    }, 100);
+  });
+  newChatBtn.addEventListener("click", newChat);
 
-  // Expose functions for inline handlers
-  window.newChat = newChat;
-  window.switchChat = switchChat;
-  window.renameChat = renameChat;
-  window.deleteChat = deleteChat;
-  window.copyCode = copyCode;
-  window.downloadCode = downloadCode;
-  window.previewCode = previewCode;
+  // Accessibility: focus management for new chat
+  chatListEl.addEventListener('keydown', function(e) {
+    const items = Array.from(chatListEl.querySelectorAll('.chat-item'));
+    const idx = items.indexOf(document.activeElement);
+    if (idx === -1) return;
+    if (e.key === 'ArrowDown') {
+      e.preventDefault();
+      const next = items[idx + 1] || items[0];
+      next.focus();
+    } else if (e.key === 'ArrowUp') {
+      e.preventDefault();
+      const prev = items[idx - 1] || items[items.length - 1];
+      prev.focus();
+    }
+  });
 
+  // On load
   renderChatList();
   render();
 </script>
