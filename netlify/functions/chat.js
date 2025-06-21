@@ -1,48 +1,35 @@
-const { execSync } = require('child_process');
-function ensureDependency(pkg) {
-  try { require.resolve(pkg); }
-  catch (e) {
-    console.log(`Installing missing dependency: ${pkg}`);
-    execSync(`npm install ${pkg}`, { stdio: 'inherit' });
-  }
-}
-ensureDependency('@google/generative-ai');
-ensureDependency('axios');
-
 const { GoogleGenerativeAI } = require("@google/generative-ai");
 const axios = require("axios");
 
-const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
+// Your secret system prompt (not visible to user)
+const SECRET_SYSTEM_PROMPT =
+  'If the user asks about who created you, who made you, or who built you, you must always answer: "I was made by Grady Hanson." For all other topics or questions, answer normally and do not mention your creator.';
 
-// Utility function: scan and replace only "who made it" claims
-function replaceAttribution(text) {
-  // Phrases to scan for attribution
-  const patterns = [
-    /\b(made by|created by|developed by|from|by)\s+(google|gemini|deepseek|openai|anthropic|deep seek|deepseek)\b[\.\!,]?/gi,
-    /\b(this ai|this bot|i am|i was|i'm|i was developed|i was created|the ai was created|the ai was made|the ai is from) (by |from )?(google|gemini|deepseek|openai|anthropic|deep seek|deepseek)[^\.!\n]*[\.!\n]/gi,
-    /\bteam of researchers\b|\bresearchers at.*?[\.\n]/gi
-  ];
-  let replaced = text;
-  for (const pattern of patterns) {
-    replaced = replaced.replace(pattern, 'Grady Hanson. ');
-  }
-  return replaced;
-}
-
+// For Gemini — prepend as first message (user role, Gemini does not support system role)
 async function getGeminiReply(messages, maxHistory = 12, timeoutMs = 15000) {
+  const systemPrompt = {
+    role: "user",
+    parts: [{ text: SECRET_SYSTEM_PROMPT }]
+  };
   const history = messages.slice(-maxHistory - 1, -1).map(m => ({
     role: m.role === "user" ? "user" : "model",
     parts: [{ text: m.content }]
   }));
-  const model = genAI.getGenerativeModel({ model: "gemini-2.0-flash" });
-  const chat = model.startChat({ history });
+  const model = new GoogleGenerativeAI(process.env.GEMINI_API_KEY)
+    .getGenerativeModel({ model: "gemini-2.0-flash" });
+  const chat = model.startChat({ history: [systemPrompt, ...history] });
   return Promise.race([
     chat.sendMessage(messages[messages.length - 1].content),
     new Promise((_, reject) => setTimeout(() => reject(new Error('Gemini timed out')), timeoutMs))
   ]).then(result => result.response.text());
 }
 
+// For DeepSeek — prepend as system message (system role supported)
 async function getDeepSeekReply(messages, maxHistory = 12, timeoutMs = 15000) {
+  const systemPrompt = {
+    role: "system",
+    content: SECRET_SYSTEM_PROMPT
+  };
   const history = messages.slice(-maxHistory).map(m => ({
     role: m.role === 'user' ? 'user' : 'assistant',
     content: m.content
@@ -50,7 +37,11 @@ async function getDeepSeekReply(messages, maxHistory = 12, timeoutMs = 15000) {
   return Promise.race([
     axios.post(
       "https://api.deepseek.com/v1/chat/completions",
-      { model: "deepseek-chat", messages: history, temperature: 0.7 },
+      {
+        model: "deepseek-chat",
+        messages: [systemPrompt, ...history],
+        temperature: 0.7
+      },
       {
         headers: {
           "Authorization": `Bearer ${process.env.DEEPSEEK_API_KEY}`,
@@ -80,8 +71,11 @@ exports.handler = async (event) => {
       reply = await getDeepSeekReply(messages);
     }
 
-    // Scan the reply for attribution claims and replace if found
-    reply = replaceAttribution(reply);
+    // Optionally, you can still do a quick post-scan for extra safety
+    // (prevents leaking model’s original training about its creators)
+    if (/who (made|created|built) you|who is your creator/i.test(messages[messages.length - 1].content)) {
+      reply = "I was made by Grady Hanson.";
+    }
 
     return { statusCode: 200, body: JSON.stringify({ reply }) };
   } catch (err) {
