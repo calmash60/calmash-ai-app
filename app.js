@@ -1,4 +1,4 @@
-// Feature detection for localStorage
+// --------- Utilities ------------
 function isLocalStorageAvailable() {
   try {
     const test = '__localStorageTest__';
@@ -9,7 +9,15 @@ function isLocalStorageAvailable() {
     return false;
   }
 }
+function debounce(fn, t) {
+  let id = null;
+  return function(...a) {
+    clearTimeout(id);
+    id = setTimeout(() => fn.apply(this, a), t);
+  }
+}
 
+// --------- Theme & DOM ----------
 const darkToggle = document.getElementById('dark-toggle');
 darkToggle.addEventListener('click', () => {
   document.body.classList.toggle('dark-mode');
@@ -34,6 +42,7 @@ const newChatBtn = document.getElementById("new-chat");
 let chats = {};
 let currentChatId = null;
 
+// --------- Chat State -----------
 function loadChats() {
   if (isLocalStorageAvailable()) {
     try {
@@ -58,7 +67,7 @@ function saveChats() {
 }
 
 function createChat() {
-  const id = Date.now().toString() + Math.random().toString(36).slice(2, 8); // reduce collision risk
+  const id = Date.now().toString() + Math.random().toString(36).slice(2, 8);
   chats[id] = { name: "New Chat", messages: [] };
   saveChats();
   return id;
@@ -79,7 +88,7 @@ function newChat() {
 function renameChat(id) {
   const oldName = chats[id].name;
   let name = window.prompt("Rename chat:", oldName);
-  if (name === null) return; // Cancelled
+  if (name === null) return;
   name = name.trim();
   if (!name) {
     alert("Chat name cannot be empty.");
@@ -104,6 +113,7 @@ function deleteChat(id) {
   }
 }
 
+// --------- Chat List Render -----
 function renderChatList() {
   chatListEl.innerHTML = "";
   Object.entries(chats).forEach(([id, chat]) => {
@@ -122,8 +132,8 @@ function renderChatList() {
     // Rename
     const renameBtn = document.createElement('button');
     renameBtn.type = "button";
-    renameBtn.innerText = '✏️';
     renameBtn.className = 'edit-btn';
+    renameBtn.innerHTML = '<i class="fa fa-pen-to-square"></i>';
     renameBtn.setAttribute('aria-label', 'Rename chat');
     renameBtn.addEventListener('click', (e) => {
       e.stopPropagation();
@@ -132,8 +142,8 @@ function renderChatList() {
     // Delete
     const delBtn = document.createElement('button');
     delBtn.type = "button";
-    delBtn.innerText = '🗑️';
     delBtn.className = 'delete-msg-btn';
+    delBtn.innerHTML = '<i class="fa fa-trash"></i>';
     delBtn.setAttribute('aria-label', 'Delete chat');
     delBtn.addEventListener('click', (e) => {
       e.stopPropagation();
@@ -156,15 +166,21 @@ function renderChatList() {
   });
 }
 
+// --------- Virtual Scroll Render --------
+// Only render messages in the viewport for speed
 function render() {
   chatBox.innerHTML = "";
   errorBanner.style.display = "none";
   const messages = chats[currentChatId]?.messages || [];
+  // Virtual scroll: render only last 50 messages or all if fewer
+  const MAX = 50;
+  const start = messages.length > MAX ? messages.length - MAX : 0;
   if (messages.length === 0) {
     chatBox.innerHTML = '<div class="placeholder">Start a new chat or select an existing one.</div>';
     return;
   }
-  messages.forEach((msg, idx) => {
+  for (let idx = start; idx < messages.length; idx++) {
+    const msg = messages[idx];
     const div = document.createElement("div");
     div.className = `message ${msg.role}`;
     // Code block highlighting and code actions
@@ -177,20 +193,19 @@ function render() {
           return `
             <pre><code>${DOMPurify.sanitize(code.trim())}</code></pre>
             <div class="code-actions">
-              <button type="button" data-action="copy" data-code="${encoded}" aria-label="Copy code">📋 Copy</button>
-              <button type="button" data-action="download" data-code="${encoded}" data-ext="${ext}" aria-label="Download code">💾 Download</button>
-              <button type="button" data-action="preview" data-code="${encoded}" data-lang="${lang || 'html'}" aria-label="Preview code">👁 Preview</button>
+              <button type="button" data-action="copy" data-code="${encoded}" aria-label="Copy code"><i class="fa fa-copy"></i> Copy</button>
+              <button type="button" data-action="download" data-code="${encoded}" data-ext="${ext}" aria-label="Download code"><i class="fa fa-download"></i> Download</button>
+              <button type="button" data-action="preview" data-code="${encoded}" data-lang="${lang || 'html'}" aria-label="Preview code"><i class="fa fa-eye"></i> Preview</button>
             </div>`;
         })
       );
     } else {
       div.textContent = msg.content;
     }
-    // Edit and Delete buttons for messages (user messages only)
     if (msg.role === 'user') {
       const editBtn = document.createElement('button');
       editBtn.type = "button";
-      editBtn.innerText = 'Edit';
+      editBtn.innerHTML = '<i class="fa fa-pen"></i> Edit';
       editBtn.className = 'edit-btn';
       editBtn.setAttribute('aria-label', 'Edit message');
       editBtn.addEventListener('click', () => editMessage(idx));
@@ -198,14 +213,14 @@ function render() {
 
       const delBtn = document.createElement('button');
       delBtn.type = "button";
-      delBtn.innerText = 'Delete';
+      delBtn.innerHTML = '<i class="fa fa-trash"></i> Delete';
       delBtn.className = 'delete-msg-btn';
       delBtn.setAttribute('aria-label', 'Delete message');
       delBtn.addEventListener('click', () => deleteMessage(idx));
       div.appendChild(delBtn);
     }
     chatBox.appendChild(div);
-  });
+  }
   chatBox.scrollTop = chatBox.scrollHeight;
 }
 
@@ -228,14 +243,13 @@ function deleteMessage(idx) {
   }
 }
 
-// Event delegation for code actions
+// --------- Code Block Actions ---------
 chatBox.addEventListener('click', function(e) {
   const btn = e.target.closest('button[data-action]');
   if (!btn) return;
   const code = decodeURIComponent(btn.getAttribute('data-code'));
   const action = btn.getAttribute('data-action');
   if (action === 'copy') {
-    // Clipboard API fallback for older browsers
     if (navigator.clipboard && typeof navigator.clipboard.writeText === 'function') {
       navigator.clipboard.writeText(code)
         .then(() => alert("Copied to clipboard!"))
@@ -261,12 +275,10 @@ chatBox.addEventListener('click', function(e) {
     previewCode(code, lang);
   }
 });
-
-// Fallback for copying text to clipboard
 function fallbackCopyTextToClipboard(text) {
   let textarea = document.createElement("textarea");
   textarea.value = text;
-  textarea.style.position = "fixed"; // Prevent scrolling to bottom
+  textarea.style.position = "fixed";
   document.body.appendChild(textarea);
   textarea.focus();
   textarea.select();
@@ -278,11 +290,9 @@ function fallbackCopyTextToClipboard(text) {
   }
   document.body.removeChild(textarea);
 }
-
 function previewCode(code, lang) {
   const win = window.open("", "_blank", "noopener");
   if (lang === "html") {
-    // Use DOMPurify for HTML sanitization
     const safe = DOMPurify.sanitize(code);
     win.document.write(`<iframe sandbox="allow-scripts" style="width:100vw;height:100vh;border:0;" srcdoc="${safe.replace(/"/g, '&quot;')}"></iframe>`);
   } else {
@@ -290,11 +300,10 @@ function previewCode(code, lang) {
   }
 }
 
-// Robust sendMessage with file input validation and browser compatibility
+// --------- Message Send & Server -----
 async function sendMessage() {
   errorBanner.style.display = "none";
   const input = promptInput.value.trim();
-  // File validation
   if (!input && (!fileInput.files || !fileInput.files.length)) {
     errorBanner.innerText = "Input is empty.";
     errorBanner.style.display = "block";
@@ -302,7 +311,7 @@ async function sendMessage() {
   }
   if (fileInput.files && fileInput.files.length) {
     const file = fileInput.files[0];
-    if (file.size > 500 * 1024) { // 500 KB limit
+    if (file.size > 500 * 1024) {
       errorBanner.innerText = "File too large. Max 500KB.";
       errorBanner.style.display = "block";
       return;
@@ -330,7 +339,6 @@ async function sendMessage() {
   } else {
     sendToServer(chat);
   }
-
   render();
   promptInput.value = "";
   fileInput.value = "";
@@ -338,19 +346,24 @@ async function sendMessage() {
 
 async function sendToServer(chat) {
   loadingIndicator.style.display = 'block';
-  // Fetch timeout for browser compatibility
+  // Add a 'pending' message for a better UX
+  chat.messages.push({ role: "ai", content: "..." });
+  render();
   let didTimeout = false;
   let timeoutId = setTimeout(() => {
     didTimeout = true;
     loadingIndicator.style.display = 'none';
     errorBanner.innerText = "Request timed out.";
     errorBanner.style.display = "block";
-  }, 20000); // 20 seconds
+    // Remove pending message
+    chat.messages = chat.messages.filter(m => m.content !== "...");
+    render();
+  }, 25000); // 25 seconds
   try {
     const res = await fetch("/.netlify/functions/chat", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ messages: chat.messages })
+      body: JSON.stringify({ messages: chat.messages.filter(m => m.content !== "...") })
     });
     clearTimeout(timeoutId);
     if (didTimeout) return;
@@ -360,6 +373,8 @@ async function sendToServer(chat) {
     } catch (err) {
       throw new Error("Invalid server response.");
     }
+    // Remove pending
+    chat.messages = chat.messages.filter(m => m.content !== "...");
     if (!res.ok) {
       throw new Error(data?.error || "Network error");
     }
@@ -367,6 +382,7 @@ async function sendToServer(chat) {
     render();
     saveChats();
   } catch (e) {
+    chat.messages = chat.messages.filter(m => m.content !== "...");
     chat.messages.push({ role: "ai", content: "Error: " + e.message });
     errorBanner.innerText = "Error: " + e.message;
     errorBanner.style.display = "block";
@@ -376,7 +392,7 @@ async function sendToServer(chat) {
   }
 }
 
-// Button/event wiring
+// --------- Button & Events -------
 sendBtn.addEventListener("click", sendMessage);
 promptInput.addEventListener("keydown", e => {
   if (e.key === "Enter") sendMessage();
@@ -396,7 +412,6 @@ exportBtn.addEventListener("click", function() {
 });
 newChatBtn.addEventListener("click", newChat);
 
-// Accessibility: focus management for new chat
 chatListEl.addEventListener('keydown', function(e) {
   const items = Array.from(chatListEl.querySelectorAll('.chat-item'));
   const idx = items.indexOf(document.activeElement);
@@ -412,7 +427,7 @@ chatListEl.addEventListener('keydown', function(e) {
   }
 });
 
-// On load
+// --------- Init ---------------
 loadChats();
 renderChatList();
 render();
