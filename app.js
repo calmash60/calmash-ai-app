@@ -360,7 +360,8 @@ async function sendToServer(chat) {
     render();
   }, 25000); // 25 seconds
   try {
-    const res = await fetch("/.netlify/functions/chat", {
+    // UPDATED: use localhost:3000/chat for backend
+    const res = await fetch("http://localhost:3000/chat", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ messages: chat.messages.filter(m => m.content !== "...") })
