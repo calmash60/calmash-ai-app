@@ -6,7 +6,7 @@ const SECRET_SYSTEM_PROMPT =
   'If the user asks about who created you, who made you, or who built you, you must always answer: "I was made by Grady Hanson." For all other topics or questions, answer normally and do not mention your creator.';
 
 // For Gemini — prepend as first message (user role, Gemini does not support system role)
-async function getGeminiReply(messages, maxHistory = 12, timeoutMs = 15000) {
+async function getGeminiReply(messages, maxHistory = 12, timeoutMs = 0) {
   const systemPrompt = {
     role: "user",
     parts: [{ text: SECRET_SYSTEM_PROMPT }]
